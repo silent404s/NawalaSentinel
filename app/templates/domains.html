@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Kelola Domain — NawalaSentinel Monitor{% endblock %}
+
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Kelola & Pemantauan Domain</h1>
+        <p class="page-subtitle">Daftar ratusan domain & subdomain yang dipantau di operator Telkomsel, XL, Tri, & IM3</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button onclick="document.getElementById('importSection').scrollIntoView({behavior: 'smooth'})" class="btn btn-primary">
+            📥 Import Massal (TXT/CSV)
+        </button>
+        <a href="/api/export" class="btn btn-secondary" target="_blank">
+            📄 Ekspor Report (CSV)
+        </a>
+    </div>
+</div>
+
+<!-- Import Massal Section -->
+<div id="importSection" class="glass-card" style="margin-bottom: 2rem;">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">➕ Tambah / Import Massal Domain</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        
+        <!-- Form Unggah File -->
+        <form id="importForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">📄 Unggah File Massal (TXT / CSV):</label>
+                <input type="file" name="file" accept=".txt,.csv" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kategori (Opsional):</label>
+                <input type="text" name="category" value="General" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-success" style="width: 100%;">Unggah & Impor File</button>
+        </form>
+
+        <!-- Form Paste Teks Massal -->
+        <form id="addTextForm">
+            <div class="form-group">
+                <label class="form-label">✍️ Tulis / Paste Daftar Domain & Subdomain (1 per baris):</label>
+                <textarea name="raw_domains" class="form-control" placeholder="example.com&#10;sub.example.com&#10;domain2.com" required></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kategori:</label>
+                <input type="text" name="category" value="General" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Tambahkan Domain</button>
+        </form>
+    </div>
+</div>
+
+<!-- Filter & Search Bar -->
+<div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
+    <form method="GET" action="/domains" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        <div style="flex: 1; min-width: 240px;">
+            <input type="text" name="q" value="{{ q }}" placeholder="🔍 Cari nama domain atau subdomain..." class="form-control">
+        </div>
+        <div>
+            <select name="status" class="form-control" onchange="this.form.submit()">
+                <option value="ALL" {% if status == 'ALL' %}selected{% endif %}>Semua Status</option>
+                <option value="NORMAL" {% if status == 'NORMAL' %}selected{% endif %}>NORMAL (Aktif)</option>
+                <option value="BLOCKED" {% if status == 'BLOCKED' %}selected{% endif %}>BLOCKED (Terblokir)</option>
+                <option value="MIXED" {% if status == 'MIXED' %}selected{% endif %}>MIXED (Sebagian)</option>
+                <option value="UNCHECKED" {% if status == 'UNCHECKED' %}selected{% endif %}>UNCHECKED</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Cari</button>
+    </form>
+</div>
+
+<!-- Main Domains Table -->
+<div class="glass-card" style="padding: 0;">
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Domain / Subdomain</th>
+                    <th>Status Utama</th>
+                    <th>Telkomsel</th>
+                    <th>XL Axiata</th>
+                    <th>IM3 Indosat</th>
+                    <th>Tri (3)</th>
+                    <th>Terakhir Dicek</th>
+                    <th style="text-align: right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for domain in domains %}
+                {% set op_dict = op_results_map.get(domain.id, {}) %}
+                <tr>
+                    <td class="domain-name-cell">
+                        {{ domain.name }}
+                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Kategori: {{ domain.category }}</div>
+                    </td>
+                    <td>
+                        <span class="status-pill {{ domain.overall_status }}">
+                            {% if domain.overall_status == 'NORMAL' %}✅ Normal{% elif domain.overall_status == 'BLOCKED' %}🚨 Terblokir{% elif domain.overall_status == 'MIXED' %}⚠️ Mixed{% else %}⏳ Unchecked{% endif %}
+                        </span>
+                    </td>
+
+                    <!-- Telkomsel Badge -->
+                    <td>
+                        {% set tsel = op_dict.get('Telkomsel') %}
+                        {% if tsel %}
+                            <span class="status-pill {{ tsel.status }}" title="{{ tsel.block_reason }} | Latency: {{ tsel.latency_ms }}ms">
+                                {{ tsel.status }}
+                            </span>
+                        {% else %}
+                            <span class="status-pill UNCHECKED">-</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- XL Badge -->
+                    <td>
+                        {% set xl = op_dict.get('XL') %}
+                        {% if xl %}
+                            <span class="status-pill {{ xl.status }}" title="{{ xl.block_reason }} | Latency: {{ xl.latency_ms }}ms">
+                                {{ xl.status }}
+                            </span>
+                        {% else %}
+                            <span class="status-pill UNCHECKED">-</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- IM3 Badge -->
+                    <td>
+                        {% set im3 = op_dict.get('IM3') %}
+                        {% if im3 %}
+                            <span class="status-pill {{ im3.status }}" title="{{ im3.block_reason }} | Latency: {{ im3.latency_ms }}ms">
+                                {{ im3.status }}
+                            </span>
+                        {% else %}
+                            <span class="status-pill UNCHECKED">-</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Tri Badge -->
+                    <td>
+                        {% set tri = op_dict.get('Tri') %}
+                        {% if tri %}
+                            <span class="status-pill {{ tri.status }}" title="{{ tri.block_reason }} | Latency: {{ tri.latency_ms }}ms">
+                                {{ tri.status }}
+                            </span>
+                        {% else %}
+                            <span class="status-pill UNCHECKED">-</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="font-size: 0.82rem; color: var(--text-muted);">
+                        {% if domain.last_checked_at %}{{ domain.last_checked_at.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}Belum dicek{% endif %}
+                    </td>
+
+                    <!-- Actions -->
+                    <td style="text-align: right;">
+                        <button class="btn btn-secondary btn-recheck-domain" data-id="{{ domain.id }}" title="Cek ulang sekarang" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;">
+                            ⚡
+                        </button>
+                        <button class="btn btn-danger btn-delete-domain" data-id="{{ domain.id }}" data-name="{{ domain.name }}" title="Hapus domain" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                        Tidak ada domain yang ditemukan.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Pengaturan — NawalaSentinel Monitor{% endblock %}
+
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Pengaturan Sistem</h1>
+        <p class="page-subtitle">Konfigurasi Bot Telegram, Interval Penjadwalan, Operator DNS, & Proxy</p>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+
+    <!-- Telegram & Alerting Form -->
+    <div class="glass-card">
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">✈️ Integrasi Bot Telegram & Alerting</h3>
+        
+        <form id="settingsForm">
+            <div class="form-group">
+                <label class="form-label">Telegram Bot Token:</label>
+                <input type="password" id="telegram_token" name="telegram_token" value="{{ settings.TELEGRAM_BOT_TOKEN }}" placeholder="123456789:ABCdefGHIjklMNOpqrs..." class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Telegram Chat ID / Channel ID:</label>
+                <input type="text" id="telegram_chat_id" name="telegram_chat_id" value="{{ settings.TELEGRAM_CHAT_ID }}" placeholder="-100123456789 atau 1234567" class="form-control">
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem;">
+                <input type="checkbox" id="telegram_enabled" name="telegram_enabled" value="true" {% if settings.TELEGRAM_ALERTS_ENABLED %}checked{% endif %} style="width: 18px; height: 18px;">
+                <label for="telegram_enabled" style="font-weight: 600; cursor: pointer;">Aktifkan Notifikasi Telegram Otomatis</label>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+
+            <div class="form-group">
+                <label class="form-label">⏱️ Interval Pengecekan Otomatis (Menit):</label>
+                <input type="number" name="check_interval" value="{{ settings.CHECK_INTERVAL_MINUTES }}" min="1" max="1440" class="form-control">
+                <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem; display: block;">Default: Setiap 5 menit sekali</small>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Simpan Pengaturan</button>
+                <button type="button" id="btnTestTelegram" class="btn btn-secondary">✈️ Tes Telegram</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Operator Network Overview -->
+    <div class="glass-card">
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">📡 Konfigurasi DNS Resolver Operator</h3>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div style="background: rgba(11,15,25,0.5); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span class="operator-badge op-badge-tsel">Telkomsel</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Aktivasi Proxy: {% if settings.OPERATOR_PROXIES.Telkomsel %}Aktif{% else %}Tidak{% endif %}</span>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                    DNS Resolver: {{ settings.OPERATOR_DNS.Telkomsel | join(', ') }}
+                </div>
+            </div>
+
+            <div style="background: rgba(11,15,25,0.5); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span class="operator-badge op-badge-xl">XL Axiata</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Aktivasi Proxy: {% if settings.OPERATOR_PROXIES.XL %}Aktif{% else %}Tidak{% endif %}</span>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                    DNS Resolver: {{ settings.OPERATOR_DNS.XL | join(', ') }}
+                </div>
+            </div>
+
+            <div style="background: rgba(11,15,25,0.5); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span class="operator-badge op-badge-im3">IM3 Indosat</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Aktivasi Proxy: {% if settings.OPERATOR_PROXIES.IM3 %}Aktif{% else %}Tidak{% endif %}</span>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                    DNS Resolver: {{ settings.OPERATOR_DNS.IM3 | join(', ') }}
+                </div>
+            </div>
+
+            <div style="background: rgba(11,15,25,0.5); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span class="operator-badge op-badge-tri">Tri (3)</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Aktivasi Proxy: {% if settings.OPERATOR_PROXIES.Tri %}Aktif{% else %}Tidak{% endif %}</span>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                    DNS Resolver: {{ settings.OPERATOR_DNS.Tri | join(', ') }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

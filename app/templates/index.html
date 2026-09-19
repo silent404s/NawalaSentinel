@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — NawalaSentinel Domain Monitor{% endblock %}
+
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard Pemantauan</h1>
+        <p class="page-subtitle">Monitoring real-time status pemblokiran domain di jaringan Telkomsel, XL, Tri, & IM3</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button id="btnCheckNow" class="btn btn-primary">
+            ⚡ Cek Massal Sekarang
+        </button>
+        <a href="/api/export" class="btn btn-secondary" target="_blank">
+            📥 Ekspor Laporan (CSV)
+        </a>
+    </div>
+</div>
+
+<!-- Countdown Schedule Banner -->
+<div class="glass-card" style="margin-bottom: 1.5rem; padding: 0.85rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-left: 4px solid var(--accent-indigo);">
+    <div style="display: flex; align-items: center; gap: 0.85rem;">
+        <span style="font-size: 1.4rem;">⏱️</span>
+        <div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Penjadwalan Pengecekan Otomatis</div>
+            <div style="font-size: 0.88rem; color: var(--text-muted);">Pencekan otomatis seluruh domain setiap {{ check_interval_minutes }} menit di background</div>
+        </div>
+    </div>
+    <div style="text-align: right;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Waktu Tersisa:</div>
+        <div id="countdownTimer" data-seconds="{{ next_check_seconds }}" style="font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 800; color: var(--accent-cyan);">
+            00m 00s
+        </div>
+    </div>
+</div>
+
+<!-- Stats Counter Grid -->
+
+<div class="stats-grid">
+    <div class="glass-card stat-card">
+        <div>
+            <div class="stat-label">Total Domain</div>
+            <div class="stat-val" style="color: #ffffff;">{{ stats.total }}</div>
+        </div>
+        <div class="stat-icon" style="background: rgba(255,255,255,0.08); color: #ffffff;">🌐</div>
+    </div>
+
+    <div class="glass-card stat-card">
+        <div>
+            <div class="stat-label">Domain Aktif (Normal)</div>
+            <div class="stat-val" style="color: var(--status-normal);">{{ stats.normal }}</div>
+        </div>
+        <div class="stat-icon" style="background: var(--status-normal-bg); color: var(--status-normal);">✅</div>
+    </div>
+
+    <div class="glass-card stat-card">
+        <div>
+            <div class="stat-label">Terblokir Total</div>
+            <div class="stat-val" style="color: var(--status-blocked);">{{ stats.blocked }}</div>
+        </div>
+        <div class="stat-icon" style="background: var(--status-blocked-bg); color: var(--status-blocked);">🚨</div>
+    </div>
+
+    <div class="glass-card stat-card">
+        <div>
+            <div class="stat-label">Terblokir Sebagian (Mixed)</div>
+            <div class="stat-val" style="color: var(--status-mixed);">{{ stats.mixed }}</div>
+        </div>
+        <div class="stat-icon" style="background: var(--status-mixed-bg); color: var(--status-mixed);">⚠️</div>
+    </div>
+</div>
+
+<!-- Operator Breakdown Cards -->
+<div style="margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-secondary);">Status Pemblokiran Per Operator Seluler</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="glass-card" style="padding: 1.25rem;">
+            <div class="operator-badge op-badge-tsel">Telkomsel</div>
+            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
+                {{ stats.op_blocked.Telkomsel }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
+            </div>
+        </div>
+
+        <div class="glass-card" style="padding: 1.25rem;">
+            <div class="operator-badge op-badge-xl">XL Axiata</div>
+            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
+                {{ stats.op_blocked.XL }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
+            </div>
+        </div>
+
+        <div class="glass-card" style="padding: 1.25rem;">
+            <div class="operator-badge op-badge-im3">IM3 Indosat</div>
+            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
+                {{ stats.op_blocked.IM3 }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
+            </div>
+        </div>
+
+        <div class="glass-card" style="padding: 1.25rem;">
+            <div class="operator-badge op-badge-tri">Tri (3)</div>
+            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
+                {{ stats.op_blocked.Tri }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;" class="dashboard-sections">
+    <!-- Domain Table Preview -->
+    <div class="glass-card" style="padding: 0;">
+        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.05rem; font-weight: 700;">Domain Terbaru Dipantau</h3>
+            <a href="/domains" style="color: var(--accent-indigo); text-decoration: none; font-size: 0.88rem; font-weight: 600;">Lihat Semua &rarr;</a>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Domain / Subdomain</th>
+                        <th>Kategori</th>
+                        <th>Status Utama</th>
+                        <th>Terakhir Dicek</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for domain in domains %}
+                    <tr>
+                        <td class="domain-name-cell">{{ domain.name }}</td>
+                        <td><span style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">{{ domain.category }}</span></td>
+                        <td>
+                            <span class="status-pill {{ domain.overall_status }}">
+                                {% if domain.overall_status == 'NORMAL' %}✅ Normal{% elif domain.overall_status == 'BLOCKED' %}🚨 Terblokir{% elif domain.overall_status == 'MIXED' %}⚠️ Mixed{% else %}⏳ Unchecked{% endif %}
+                            </span>
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.83rem;">
+                            {% if domain.last_checked_at %}{{ domain.last_checked_at.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}Belum dicek{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Belum ada domain terdaftar. <a href="/domains" style="color: var(--accent-indigo);">Tambah Domain Massal &rarr;</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Alerts / Activity Feed -->
+    <div class="glass-card">
+        <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem;">📜 Aktivitas Perubahan Terbaru</h3>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            {% for log in recent_logs %}
+            <div style="background: rgba(11, 15, 25, 0.5); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600;">{{ log.domain_name }}</span>
+                    <span class="operator-badge {% if log.operator == 'Telkomsel' %}op-badge-tsel{% elif log.operator == 'XL' %}op-badge-xl{% elif log.operator == 'IM3' %}op-badge-im3{% else %}op-badge-tri{% endif %}">{{ log.operator }}</span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                    Perubahan: <span style="color: var(--text-muted);">{{ log.previous_status }}</span> &rarr; 
+                    <strong style="color: {% if log.new_status == 'BLOCKED' %}#ef4444{% else %}#10b981{% endif %};">{{ log.new_status }}</strong>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ log.timestamp.strftime('%H:%M:%S - %d %b %Y') }}</div>
+            </div>
+            {% else %}
+            <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">Belum ada riwayat perubahan status.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

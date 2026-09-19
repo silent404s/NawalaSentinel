@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NawalaSentinel — Multi-Operator Domain Block Monitor{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="app-header">
+        <div class="nav-container">
+            <a href="/" class="brand-logo">
+                <div class="brand-icon">🛡️</div>
+                <span>NawalaSentinel</span>
+            </a>
+
+            <nav class="nav-menu">
+                <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+                    📊 Dashboard
+                </a>
+                <a href="/domains" class="nav-link {% if active_page == 'domains' %}active{% endif %}">
+                    🌐 Kelola Domain
+                </a>
+                <a href="/logs" class="nav-link {% if active_page == 'logs' %}active{% endif %}">
+                    📜 Riwayat Status
+                </a>
+                <a href="/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">
+                    ⚙️ Pengaturan
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <p>NawalaSentinel Pro &copy; 2026 — Multi-Operator ISP Block Monitor (Telkomsel, XL, Tri, IM3 Engine)</p>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
