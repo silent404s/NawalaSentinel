@@ -36,6 +36,7 @@ class OperatorBlockChecker:
         Pengecekan ke Database Resmi TrustPositif Komdigi / Nawala.
         Return True jika domain terdaftar sebagai diblokir (Status: 'Ada').
         """
+        host = domain.split("/")[0].strip().lower()
         async with self._tp_lock:
             if self._tp_client is None or self._tp_client.is_closed:
                 self._tp_client = httpx.AsyncClient(verify=False, timeout=6.0)
@@ -54,7 +55,7 @@ class OperatorBlockChecker:
             try:
                 res = await self._tp_client.post(
                     'https://trustpositif.komdigi.go.id/Rest_server/getrecordsname_home',
-                    data={'csrf_token': self._tp_csrf, 'name': domain.strip().lower()},
+                    data={'csrf_token': self._tp_csrf, 'name': host},
                     headers={
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -79,13 +80,14 @@ class OperatorBlockChecker:
         """
         Kueri DNS Publik (1.1.1.1, 8.8.8.8) untuk memvalidasi apakah domain benar-benar terdaftar dan aktif.
         """
+        host = domain.split("/")[0].strip()
         resolver = dns.asyncresolver.Resolver(configure=False)
         resolver.nameservers = settings.PUBLIC_DNS
         resolver.timeout = 2.5
         resolver.lifetime = 3.5
 
         try:
-            answers = await resolver.resolve(domain, 'A')
+            answers = await resolver.resolve(host, 'A')
             ips = [rdata.address for rdata in answers]
             return True, ips, "DNS Resolved"
         except dns.resolver.NXDOMAIN:
@@ -105,6 +107,7 @@ class OperatorBlockChecker:
         if not dns_servers:
             return False, [], "No DNS server defined"
 
+        host = domain.split("/")[0].strip()
         resolver = dns.asyncresolver.Resolver(configure=False)
         resolver.nameservers = dns_servers
         resolver.timeout = 3.0
@@ -112,7 +115,7 @@ class OperatorBlockChecker:
 
         try:
             # Kueri DNS A Record
-            answers = await resolver.resolve(domain, 'A')
+            answers = await resolver.resolve(host, 'A')
             resolved_ips = [rdata.address for rdata in answers]
 
             # Cek apakah IP yang didapat merupakan IP Sinkhole Pemblokiran
@@ -135,13 +138,22 @@ class OperatorBlockChecker:
     async def check_cloudflare_status(self, domain: str) -> Tuple[str, str]:
         """
         Pengecekan independen khusus status Cloudflare (Suspected Phishing, Cloudflare Block).
+        Mendukung URL dengan path spesifik (misal: vpngwnlog.com/login)
+        maupun root domain (yang akan otomatis menguji /login juga).
         Return: (cf_status: 'PHISHING' | 'CLEAN', cf_reason: str)
         """
 
-        target_urls = [
-            f"https://{domain}",
-            f"http://{domain}",
-        ]
+        if "/" in domain:
+            target_urls = [
+                f"https://{domain}",
+                f"http://{domain}",
+            ]
+        else:
+            target_urls = [
+                f"https://{domain}",
+                f"http://{domain}",
+                f"https://{domain}/login",
+            ]
 
         client_kwargs = {
             "headers": self.headers,

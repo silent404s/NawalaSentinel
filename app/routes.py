@@ -26,15 +26,15 @@ templates.env.filters["wib_datetime"] = format_wib
 templates.env.filters["wib_time"] = format_time_wib
 
 
-# Helper untuk normalisasi domain name
+# Helper untuk normalisasi domain name / URL
 def normalize_domain(domain_str: str) -> str:
     domain_str = domain_str.strip().lower()
     if domain_str.startswith("http://"):
         domain_str = domain_str[7:]
     elif domain_str.startswith("https://"):
         domain_str = domain_str[8:]
-    if "/" in domain_str:
-        domain_str = domain_str.split("/")[0]
+    # Hapus trailing slash saja, pertahankan path (misal: vpngwnlog.com/login)
+    domain_str = domain_str.rstrip("/")
     return domain_str.strip()
 
 
