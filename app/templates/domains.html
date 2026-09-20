@@ -1,84 +1,154 @@
 {% extends "base.html" %}
 
-{% block title %}Kelola Domain — NawalaSentinel Monitor{% endblock %}
-
+{% block title %}Kelola Domain — NawalaSentinel{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="page-header">
     <div>
-        <h1 class="page-title">Kelola & Pemantauan Domain</h1>
-        <p class="page-subtitle">Daftar ratusan domain & subdomain yang dipantau di operator Telkomsel, XL, Tri, & IM3</p>
+        <h1 class="page-title">Inventaris & Pemantauan Domain</h1>
+        <p class="page-subtitle">Daftar domain/subdomain aktif dalam antrean surveillance ISP</p>
     </div>
-    <div style="display: flex; gap: 0.75rem;">
-        <button onclick="document.getElementById('importSection').scrollIntoView({behavior: 'smooth'})" class="btn btn-primary">
-            📥 Import Massal (TXT/CSV)
-        </button>
+    <div class="page-actions">
         <a href="/api/export" class="btn btn-secondary" target="_blank">
-            📄 Ekspor Report (CSV)
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Ekspor CSV
         </a>
     </div>
 </div>
 
-<!-- Import Massal Section -->
-<div id="importSection" class="glass-card" style="margin-bottom: 2rem;">
-    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">➕ Tambah / Import Massal Domain</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-        
-        <!-- Form Unggah File -->
-        <form id="importForm" enctype="multipart/form-data">
-            <div class="form-group">
-                <label class="form-label">📄 Unggah File Massal (TXT / CSV):</label>
-                <input type="file" name="file" accept=".txt,.csv" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Kategori (Opsional):</label>
-                <input type="text" name="category" value="General" class="form-control">
-            </div>
-            <button type="submit" class="btn btn-success" style="width: 100%;">Unggah & Impor File</button>
-        </form>
+<!-- Ringkasan Metrik di Atas Tabel -->
+<div class="metrics-strip">
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Total Domain</span>
+        </div>
+        <div class="metric-val">{{ stats.total }}</div>
+    </div>
 
-        <!-- Form Paste Teks Massal -->
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Jumlah Terblokir</span>
+            <span class="metric-rate blocked">{{ stats.blocked }}</span>
+        </div>
+        <div class="metric-val" style="color: var(--status-blocked-text);">{{ stats.blocked }}</div>
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Suspected Phishing</span>
+            <span class="metric-rate phishing">{{ stats.phishing }}</span>
+        </div>
+        <div class="metric-val" style="color: #fb7185;">{{ stats.phishing }}</div>
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Rasio Pemblokiran</span>
+        </div>
+        {% if stats.block_ratio > 0 %}
+        <div class="metric-val" style="color: var(--status-blocked-text);">
+            {{ stats.block_ratio }}%
+        </div>
+        {% else %}
+        <div class="metric-val" style="color: var(--status-normal-text);">
+            {{ stats.block_ratio }}%
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Domain Aman</span>
+            <span class="metric-rate normal">{{ stats.normal }}</span>
+        </div>
+        <div class="metric-val" style="color: var(--status-normal-text);">{{ stats.normal }}</div>
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Jadwal Background</span>
+        </div>
+        <div class="metric-val countdown-timer-display" id="countdownTimer" data-seconds="{{ next_check_seconds }}" style="font-size: 1.15rem; color: var(--text-muted);">
+            00m 00s
+        </div>
+    </div>
+</div>
+
+<!-- Compact Monospace Batch Input Console -->
+<div class="console-panel">
+    <div class="console-header">
+        <div class="console-title">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            Input Batch / Paste Ribuan Domain Baru
+        </div>
+        <div class="console-counter" id="domainCounter">0 domain terdeteksi</div>
+    </div>
+    <div class="console-body">
         <form id="addTextForm">
-            <div class="form-group">
-                <label class="form-label">✍️ Tulis / Paste Daftar Domain & Subdomain (1 per baris):</label>
-                <textarea name="raw_domains" class="form-control" placeholder="example.com&#10;sub.example.com&#10;domain2.com" required></textarea>
+            <textarea id="rawDomainsTextarea" name="raw_domains" class="console-textarea" placeholder="Paste ribuan link atau domain di sini (1 per baris)...&#10;example.com&#10;sub.domain.co.id&#10;https://target-portal.com" required></textarea>
+            <input type="hidden" name="category" value="General">
+            
+            <div class="console-toolbar">
+                <div class="console-file-drop">
+                    <label class="console-file-label" for="fileInputDirect">
+                        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                        Upload CSV / TXT
+                    </label>
+                    <input type="file" id="fileInputDirect" accept=".txt,.csv" style="display: none;">
+                    <span id="fileSelectedName" style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Tambahkan Domain
+                </button>
             </div>
-            <div class="form-group">
-                <label class="form-label">Kategori:</label>
-                <input type="text" name="category" value="General" class="form-control">
-            </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Tambahkan Domain</button>
         </form>
     </div>
 </div>
 
-<!-- Filter & Search Bar -->
-<div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
-    <form method="GET" action="/domains" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-        <div style="flex: 1; min-width: 240px;">
-            <input type="text" name="q" value="{{ q }}" placeholder="🔍 Cari nama domain atau subdomain..." class="form-control">
-        </div>
-        <div>
-            <select name="status" class="form-control" onchange="this.form.submit()">
-                <option value="ALL" {% if status == 'ALL' %}selected{% endif %}>Semua Status</option>
-                <option value="NORMAL" {% if status == 'NORMAL' %}selected{% endif %}>NORMAL (Aktif)</option>
-                <option value="BLOCKED" {% if status == 'BLOCKED' %}selected{% endif %}>BLOCKED (Terblokir)</option>
-                <option value="MIXED" {% if status == 'MIXED' %}selected{% endif %}>MIXED (Sebagian)</option>
-                <option value="UNCHECKED" {% if status == 'UNCHECKED' %}selected{% endif %}>UNCHECKED</option>
-            </select>
-        </div>
-        <button type="submit" class="btn btn-secondary">Cari</button>
+<!-- Controls Bar (Segmented Filter & Instant Search) -->
+<div class="controls-bar">
+    <div class="segmented-filter">
+        <a href="/domains" class="segmented-btn {% if status == 'ALL' or not status %}active{% endif %}">
+            Semua ({{ stats.total }})
+        </a>
+        <a href="/domains?status=BLOCKED" class="segmented-btn {% if status == 'BLOCKED' %}active{% endif %}">
+            Blokir ({{ stats.blocked }})
+        </a>
+        <a href="/domains?status=PHISHING" class="segmented-btn {% if status == 'PHISHING' %}active{% endif %}">
+            Phishing ({{ stats.phishing }})
+        </a>
+        <a href="/domains?status=NORMAL" class="segmented-btn {% if status == 'NORMAL' %}active{% endif %}">
+            Aman ({{ stats.normal }})
+        </a>
+        <a href="/domains?status=MIXED" class="segmented-btn {% if status == 'MIXED' %}active{% endif %}">
+            Sebagian ({{ stats.mixed }})
+        </a>
+        <a href="/domains?status=UNCHECKED" class="segmented-btn {% if status == 'UNCHECKED' %}active{% endif %}">
+            Unchecked ({{ stats.unchecked }})
+        </a>
+    </div>
+
+    <form method="GET" action="/domains" class="filter-search-box">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" name="q" value="{{ q }}" id="tableInstantSearch" class="filter-search-input" placeholder="Cari domain...">
+        {% if status and status != 'ALL' %}
+        <input type="hidden" name="status" value="{{ status }}">
+        {% endif %}
     </form>
 </div>
 
-<!-- Main Domains Table -->
-<div class="glass-card" style="padding: 0;">
-    <div class="table-container">
-        <table class="data-table">
+<!-- High-Density Compact Data Table -->
+<div class="table-panel">
+    <div class="table-responsive">
+        <table class="compact-table" id="domainsDataTable">
             <thead>
                 <tr>
                     <th>Domain / Subdomain</th>
-                    <th>Status Utama</th>
+                    <th>Status Nawala</th>
+                    <th>STATUS CF</th>
                     <th>Telkomsel</th>
                     <th>XL Axiata</th>
                     <th>IM3 Indosat</th>
@@ -90,83 +160,118 @@
             <tbody>
                 {% for domain in domains %}
                 {% set op_dict = op_results_map.get(domain.id, {}) %}
-                <tr>
-                    <td class="domain-name-cell">
-                        {{ domain.name }}
-                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Kategori: {{ domain.category }}</div>
+                <tr class="table-row-item" data-status="{{ domain.overall_status }}" data-cf="{{ domain.cf_status }}" data-domain="{{ domain.name|lower }}">
+                    <td>
+                        <span class="cell-domain">{{ domain.name }}</span>
                     </td>
                     <td>
-                        <span class="status-pill {{ domain.overall_status }}">
-                            {% if domain.overall_status == 'NORMAL' %}✅ Normal{% elif domain.overall_status == 'BLOCKED' %}🚨 Terblokir{% elif domain.overall_status == 'MIXED' %}⚠️ Mixed{% else %}⏳ Unchecked{% endif %}
+                        <span class="badge-status {{ domain.overall_status }}">
+                            <span class="badge-dot"></span>
+                            {{ domain.overall_status }}
                         </span>
                     </td>
 
-                    <!-- Telkomsel Badge -->
+                    <!-- STATUS CF -->
+                    <td>
+                        {% if domain.cf_status == 'PHISHING' %}
+                            <span class="badge-status PHISHING" title="{{ domain.cf_reason or 'Cloudflare Suspected Phishing' }}">
+                                <span class="badge-dot"></span>
+                                PHISHING
+                            </span>
+                        {% elif domain.cf_status == 'CLEAN' or domain.cf_status == 'NORMAL' %}
+                            <span class="badge-status NORMAL" title="Cloudflare Bersih / Normal">
+                                <span class="badge-dot"></span>
+                                NORMAL
+                            </span>
+                        {% else %}
+                            <span class="badge-status UNCHECKED">
+                                <span class="badge-dot"></span>
+                                -
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Telkomsel -->
                     <td>
                         {% set tsel = op_dict.get('Telkomsel') %}
                         {% if tsel %}
-                            <span class="status-pill {{ tsel.status }}" title="{{ tsel.block_reason }} | Latency: {{ tsel.latency_ms }}ms">
-                                {{ tsel.status }}
-                            </span>
+                            <div class="isp-cell">
+                                <span class="badge-status {{ tsel.status }}" title="{{ tsel.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ tsel.status }}
+                                </span>
+                                <span class="isp-latency">{{ tsel.latency_ms }}ms</span>
+                            </div>
                         {% else %}
-                            <span class="status-pill UNCHECKED">-</span>
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
                         {% endif %}
                     </td>
 
-                    <!-- XL Badge -->
+                    <!-- XL -->
                     <td>
                         {% set xl = op_dict.get('XL') %}
                         {% if xl %}
-                            <span class="status-pill {{ xl.status }}" title="{{ xl.block_reason }} | Latency: {{ xl.latency_ms }}ms">
-                                {{ xl.status }}
-                            </span>
+                            <div class="isp-cell">
+                                <span class="badge-status {{ xl.status }}" title="{{ xl.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ xl.status }}
+                                </span>
+                                <span class="isp-latency">{{ xl.latency_ms }}ms</span>
+                            </div>
                         {% else %}
-                            <span class="status-pill UNCHECKED">-</span>
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
                         {% endif %}
                     </td>
 
-                    <!-- IM3 Badge -->
+                    <!-- IM3 -->
                     <td>
                         {% set im3 = op_dict.get('IM3') %}
                         {% if im3 %}
-                            <span class="status-pill {{ im3.status }}" title="{{ im3.block_reason }} | Latency: {{ im3.latency_ms }}ms">
-                                {{ im3.status }}
-                            </span>
+                            <div class="isp-cell">
+                                <span class="badge-status {{ im3.status }}" title="{{ im3.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ im3.status }}
+                                </span>
+                                <span class="isp-latency">{{ im3.latency_ms }}ms</span>
+                            </div>
                         {% else %}
-                            <span class="status-pill UNCHECKED">-</span>
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
                         {% endif %}
                     </td>
 
-                    <!-- Tri Badge -->
+                    <!-- Tri -->
                     <td>
                         {% set tri = op_dict.get('Tri') %}
                         {% if tri %}
-                            <span class="status-pill {{ tri.status }}" title="{{ tri.block_reason }} | Latency: {{ tri.latency_ms }}ms">
-                                {{ tri.status }}
-                            </span>
+                            <div class="isp-cell">
+                                <span class="badge-status {{ tri.status }}" title="{{ tri.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ tri.status }}
+                                </span>
+                                <span class="isp-latency">{{ tri.latency_ms }}ms</span>
+                            </div>
                         {% else %}
-                            <span class="status-pill UNCHECKED">-</span>
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
                         {% endif %}
                     </td>
 
-                    <td style="font-size: 0.82rem; color: var(--text-muted);">
-                        {% if domain.last_checked_at %}{{ domain.last_checked_at.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}Belum dicek{% endif %}
+                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
+                        {% if domain.last_checked_at %}{{ domain.last_checked_at|wib_datetime }}{% else %}Belum dicek{% endif %}
                     </td>
 
-                    <!-- Actions -->
-                    <td style="text-align: right;">
-                        <button class="btn btn-secondary btn-recheck-domain" data-id="{{ domain.id }}" title="Cek ulang sekarang" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;">
-                            ⚡
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button type="button" class="btn btn-secondary btn-xs btn-recheck-domain" data-id="{{ domain.id }}" title="Cek Ulang">
+                            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                         </button>
-                        <button class="btn btn-danger btn-delete-domain" data-id="{{ domain.id }}" data-name="{{ domain.name }}" title="Hapus domain" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;">
-                            🗑️
+                        <button type="button" class="btn btn-danger btn-xs btn-delete-domain" data-id="{{ domain.id }}" data-name="{{ domain.name }}" title="Hapus">
+                            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 3rem;">
-                        Tidak ada domain yang ditemukan.
+                <tr id="emptyTableRow">
+                    <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                        Tidak ada domain yang sesuai dengan filter saat ini.
                     </td>
                 </tr>
                 {% endfor %}

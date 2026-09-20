@@ -1,22 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Riwayat Status — NawalaSentinel Monitor{% endblock %}
-
+{% block title %}Riwayat Status — NawalaSentinel{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
         <h1 class="page-title">Riwayat Perubahan Status</h1>
-        <p class="page-subtitle">Log lengkap pergeseran status pemblokiran domain (Normal &harr; Terblokir)</p>
+        <p class="page-subtitle">Log audit pergeseran status pemblokiran domain (Normal &harr; Terblokir)</p>
     </div>
 </div>
 
-<div class="glass-card" style="padding: 0;">
-    <div class="table-container">
-        <table class="data-table">
+<div class="table-panel">
+    <div class="table-responsive">
+        <table class="compact-table">
             <thead>
                 <tr>
-                    <th>Waktu (Timestamp)</th>
+                    <th>Waktu (WIB)</th>
                     <th>Nama Domain</th>
                     <th>Operator Seluler</th>
                     <th>Status Lama</th>
@@ -27,29 +26,35 @@
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td style="font-size: 0.83rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
-                        {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S WIB') }}
+                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
+                        {{ log.timestamp|wib_datetime }}
                     </td>
-                    <td class="domain-name-cell">{{ log.domain_name }}</td>
                     <td>
-                        <span class="operator-badge {% if log.operator == 'Telkomsel' %}op-badge-tsel{% elif log.operator == 'XL' %}op-badge-xl{% elif log.operator == 'IM3' %}op-badge-im3{% else %}op-badge-tri{% endif %}">
-                            {{ log.operator }}
+                        <span class="cell-domain">{{ log.domain_name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge-operator">{{ log.operator }}</span>
+                    </td>
+                    <td>
+                        <span class="badge-status {{ log.previous_status }}">
+                            <span class="badge-dot"></span>
+                            {{ log.previous_status }}
                         </span>
                     </td>
                     <td>
-                        <span class="status-pill {{ log.previous_status }}">{{ log.previous_status }}</span>
+                        <span class="badge-status {{ log.new_status }}">
+                            <span class="badge-dot"></span>
+                            {{ log.new_status }}
+                        </span>
                     </td>
-                    <td>
-                        <span class="status-pill {{ log.new_status }}">{{ log.new_status }}</span>
-                    </td>
-                    <td style="font-size: 0.83rem; color: var(--text-secondary);">
+                    <td style="font-size: 0.78rem; color: var(--text-muted);">
                         {{ log.reason }}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
-                        Belum ada catatan perubahan status.
+                    <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                        Belum ada catatan perubahan status tercatat.
                     </td>
                 </tr>
                 {% endfor %}

@@ -1,4 +1,5 @@
 import os
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from app.config import settings
@@ -12,6 +13,16 @@ engine = create_async_engine(
     echo=False,
     future=True,
 )
+
+# Aktifkan Foreign Keys di SQLite
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    try:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+    except Exception:
+        pass
 
 # Async Session Factory
 AsyncSessionLocal = async_sessionmaker(
@@ -35,7 +46,77 @@ async def get_db():
 
 async def init_db():
     """
-    Inisialisasi tabel database saat aplikasi dimulai.
+    Inisialisasi tabel database saat aplikasi dimulai, jalankan auto-migration jika ada kolom baru,
+    serta auto-seed superadmin default.
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Migrasi otomatis untuk SQLite (jika kolom user_id belum ada pada tabel domains)
+        def migrate_sqlite_columns(sync_conn):
+            import sqlite3
+            cursor = sync_conn.connection.cursor()
+            cursor.execute("PRAGMA table_info(domains)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "user_id" not in columns:
+                cursor.execute("ALTER TABLE domains ADD COLUMN user_id INTEGER DEFAULT 1")
+                cursor.execute("UPDATE domains SET user_id = 1 WHERE user_id IS NULL")
+            if "cf_status" not in columns:
+                cursor.execute("ALTER TABLE domains ADD COLUMN cf_status VARCHAR(50) DEFAULT 'CLEAN'")
+                cursor.execute("UPDATE domains SET cf_status = 'CLEAN' WHERE cf_status IS NULL")
+            if "cf_reason" not in columns:
+                cursor.execute("ALTER TABLE domains ADD COLUMN cf_reason TEXT")
+            sync_conn.connection.commit()
+
+        await conn.run_sync(migrate_sqlite_columns)
+
+    # Auto-seed Superadmin default jika belum ada user
+    async with AsyncSessionLocal() as session:
+        from app.models import User
+        from app.auth import hash_password
+        from sqlalchemy.future import select
+
+        stmt = select(User).limit(1)
+        res = await session.execute(stmt)
+        user = res.scalar_one_or_none()
+
+        if not user:
+            new_admin = User(
+                username="admin",
+                password=hash_password("admin123"),
+                role="SUPERADMIN",
+                domain_quota=99999,
+                is_active=True
+            )
+            session.add(new_admin)
+            await session.commit()
+
+    # Muat preferensi dari AppSetting jika tersimpan di DB
+    async with AsyncSessionLocal() as session:
+        from app.models import AppSetting
+        from app.notifier import notifier
+        from sqlalchemy.future import select
+
+        res = await session.execute(select(AppSetting))
+        for row in res.scalars().all():
+            if row.key == "TELEGRAM_BOT_TOKEN" and row.value:
+                settings.TELEGRAM_BOT_TOKEN = row.value
+                notifier.bot_token = row.value
+            elif row.key == "TELEGRAM_CHAT_ID" and row.value:
+                settings.TELEGRAM_CHAT_ID = row.value
+                notifier.chat_id = row.value
+            elif row.key == "TELEGRAM_ALERTS_ENABLED":
+                settings.TELEGRAM_ALERTS_ENABLED = (row.value.lower() in ("true", "1", "t"))
+            elif row.key == "CHECK_INTERVAL_MINUTES" and row.value:
+                settings.CHECK_INTERVAL_MINUTES = int(row.value)
+            elif row.key == "LOCAL_TEST_MODE":
+                settings.LOCAL_TEST_MODE = (row.value.lower() in ("true", "1", "t"))
+            elif row.key == "TELKOMSEL_PROXY":
+                settings.OPERATOR_PROXIES["Telkomsel"] = row.value or ""
+            elif row.key == "XL_PROXY":
+                settings.OPERATOR_PROXIES["XL"] = row.value or ""
+            elif row.key == "IM3_PROXY":
+                settings.OPERATOR_PROXIES["IM3"] = row.value or ""
+            elif row.key == "TRI_PROXY":
+                settings.OPERATOR_PROXIES["Tri"] = row.value or ""
+

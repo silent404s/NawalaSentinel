@@ -1,9 +1,11 @@
+import html
 import httpx
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.config import settings
+from app.utils.timezone import now_jakarta
 
 logger = logging.getLogger("nawala_notifier")
 
@@ -47,35 +49,49 @@ class TelegramNotifier:
                 logger.error(f"Error saat menghubungi Telegram API: {e}")
                 return False
 
-    async def notify_status_change(self, domain_name: str, operator: str, old_status: str, new_status: str, reason: str, ips: str = "", chat_id: Optional[str] = None):
+    async def notify_status_change(self, domain_name: str, operator: str, old_status: str, new_status: str, reason: str, ips: str = "", cf_status: str = "CLEAN", chat_id: Optional[str] = None):
         """
         Mengirim notifikasi otomatis saat domain berubah dari NORMAL -> BLOCKED atau sebaliknya.
         """
-        is_blocked = (new_status == "BLOCKED")
+        if new_status == "BLOCKED":
+            emoji = "🚨"
+            header_title = "ALERT: DOMAIN TERBLOKIR NAWALA!"
+            status_color = "<b>TERBLOKIR (BLOCKED)</b>"
+        else:
+            emoji = "✅"
+            header_title = "UPDATE: DOMAIN KEMBALI NORMAL"
+            status_color = "<b>AKTIF (NORMAL)</b>"
         
-        emoji = "🚨" if is_blocked else "✅"
-        header_title = "ALERT: DOMAIN TERBLOKIR!" if is_blocked else "UPDATE: DOMAIN KEMBALI NORMAL"
-        status_color = "<b>TERBLOKIR (BLOCKED)</b>" if is_blocked else "<b>AKTIF (NORMAL)</b>"
-        
-        timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S WIB")
+        timestamp_str = now_jakarta().strftime("%Y-%m-%d %H:%M:%S WIB")
+
+        safe_domain = html.escape(domain_name)
+        safe_operator = html.escape(operator)
+        safe_reason = html.escape(reason)
+        safe_ips = html.escape(ips)
 
         message = (
             f"{emoji} <b>{header_title}</b> {emoji}\n\n"
-            f"🌐 <b>Domain:</b> <code>{domain_name}</code>\n"
-            f"📱 <b>Operator:</b> {operator}\n"
-            f"🔄 <b>Status Sebelumnya:</b> {old_status}\n"
-            f"⚠️ <b>Status Baru:</b> {status_color}\n"
-            f"🔍 <b>Keterangan:</b> {reason}\n"
+            f"🌐 <b>Domain:</b> <code>{safe_domain}</code>\n"
+            f"📱 <b>Operator:</b> {safe_operator}\n"
+            f"🔄 <b>Status ISP:</b> {old_status} -> {status_color}\n"
         )
+
+        if cf_status == "PHISHING":
+            message += f"🛡️ <b>Status Cloudflare:</b> ⚠️ <b>SUSPECTED PHISHING</b>\n"
+            if new_status == "BLOCKED":
+                message += f"🚨 <b>PERHATIAN GANDA:</b> Domain ini terblokir Nawala ISP SEKALIGUS terkena Suspected Phishing di Cloudflare!\n"
+
+        message += f"🔍 <b>Keterangan:</b> {safe_reason}\n"
         
-        if ips:
-            message += f"📌 <b>IP Terdeteksi:</b> <code>{ips}</code>\n"
+        if safe_ips:
+            message += f"📌 <b>IP Terdeteksi:</b> <code>{safe_ips}</code>\n"
             
         message += f"\n⏰ <i>Waktu Deteksi: {timestamp_str}</i>"
 
         # 1. Kirim Notifikasi Telegram jika diaktifkan
-        if settings.TELEGRAM_ALERTS_ENABLED and chat_id:
-            await self.send_telegram_message(message, chat_id=chat_id)
+        target_chat = chat_id or self.chat_id
+        if settings.TELEGRAM_ALERTS_ENABLED and target_chat:
+            await self.send_telegram_message(message, chat_id=target_chat)
 
         # 2. Kirim Webhook (jika dikonfigurasi)
         if settings.WEBHOOK_ALERTS_ENABLED and settings.WEBHOOK_URL:
@@ -85,8 +101,53 @@ class TelegramNotifier:
                 "operator": operator,
                 "old_status": old_status,
                 "new_status": new_status,
+                "cf_status": cf_status,
                 "reason": reason,
                 "ips": ips,
+                "timestamp": timestamp_str
+            })
+
+    async def notify_cloudflare_status(self, domain_name: str, cf_status: str, cf_reason: str, isp_status: str = "NORMAL", chat_id: Optional[str] = None):
+        """
+        Mengirim notifikasi otomatis saat status Cloudflare berubah (terkena Suspected Phishing atau pulih).
+        """
+        if cf_status == "PHISHING":
+            emoji = "⚠️"
+            header_title = "ALERT: CLOUDFLARE SUSPECTED PHISHING!"
+            cf_text = "<b>SUSPECTED PHISHING</b>"
+        else:
+            emoji = "✅"
+            header_title = "UPDATE: CLOUDFLARE STATUS AMAN (CLEAN)"
+            cf_text = "<b>CLEAN / NORMAL</b>"
+
+        timestamp_str = now_jakarta().strftime("%Y-%m-%d %H:%M:%S WIB")
+
+        safe_domain = html.escape(domain_name)
+        safe_reason = html.escape(cf_reason)
+
+        message = (
+            f"{emoji} <b>{header_title}</b> {emoji}\n\n"
+            f"🌐 <b>Domain:</b> <code>{safe_domain}</code>\n"
+            f"🛡️ <b>Status Cloudflare:</b> {cf_text}\n"
+            f"📱 <b>Status Nawala ISP:</b> <b>{isp_status}</b>\n"
+            f"🔍 <b>Keterangan:</b> {safe_reason}\n"
+        )
+        if cf_status == "PHISHING" and isp_status in ("BLOCKED", "MIXED"):
+            message += f"🚨 <b>PERHATIAN GANDA:</b> Domain ini terblokir Nawala ISP ({isp_status}) SEKALIGUS terkena Suspected Phishing di Cloudflare!\n"
+
+        message += f"\n⏰ <i>Waktu Deteksi: {timestamp_str}</i>"
+
+        target_chat = chat_id or self.chat_id
+        if settings.TELEGRAM_ALERTS_ENABLED and target_chat:
+            await self.send_telegram_message(message, chat_id=target_chat)
+
+        if settings.WEBHOOK_ALERTS_ENABLED and settings.WEBHOOK_URL:
+            await self.send_webhook_alert({
+                "event": "cloudflare_status_changed",
+                "domain": domain_name,
+                "cf_status": cf_status,
+                "isp_status": isp_status,
+                "reason": cf_reason,
                 "timestamp": timestamp_str
             })
 

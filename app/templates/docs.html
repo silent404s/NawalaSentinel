@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Panduan & Cara Kerja Sistem — NawalaSentinel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Panduan & Cara Kerja Sistem</h1>
+        <p class="page-subtitle">Dokumentasi teknis, tutorial setup bot Telegram, filter Cloudflare, dan operasional sistem</p>
+    </div>
+</div>
+
+<div class="docs-layout">
+    <!-- Sticky Sidebar Navigation -->
+    <aside class="docs-sidebar">
+        <div class="docs-sidebar-title">Daftar Panduan</div>
+        <ul class="docs-nav-list">
+            <li class="docs-nav-item">
+                <a href="#cara-kerja" class="active">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Cara Kerja Deteksi Nawala
+                </a>
+            </li>
+            <li class="docs-nav-item">
+                <a href="#telegram-bot">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    Tutorial Setup Bot Telegram
+                </a>
+            </li>
+            <li class="docs-nav-item">
+                <a href="#cloudflare-phishing">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    Cloudflare Suspected Phishing
+                </a>
+            </li>
+            <li class="docs-nav-item">
+                <a href="#input-domain">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    Format Input & Upload File
+                </a>
+            </li>
+            <li class="docs-nav-item">
+                <a href="#update-github">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                    Update Aman via GitHub (aaPanel)
+                </a>
+            </li>
+            <li class="docs-nav-item">
+                <a href="#faq">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    Tanya Jawab (FAQ)
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="docs-content">
+
+        <!-- 1. CARA KERJA SISTEM -->
+        <section id="cara-kerja" class="docs-card">
+            <h2 class="docs-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-sky);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                1. Cara Kerja Sistem Deteksi Nawala & Internet Positif
+            </h2>
+            <p class="docs-subtitle">
+                Bagaimana sistem mengetahui domain terblokir di 4 operator seluler tanpa harus memiliki kartu SIM fisik?
+            </p>
+
+            <div class="callout-box info">
+                <strong>Prinsip Inti:</strong> Nawala dan TrustPositif di Indonesia menerapkan pemblokiran di tingkat jaringan penyedia layanan internet (ISP) melalui <strong>DNS Hijacking (Sinkhole)</strong> dan <strong>HTTP Deep Packet Inspection / Redirection</strong>.
+            </div>
+
+            <div class="docs-step-list">
+                <div class="docs-step-item">
+                    <div class="docs-step-number">A</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">DNS Sinkhole Query per Operator</div>
+                        <div class="docs-step-desc">
+                            Sistem mengirimkan kueri DNS resolusi A-record langsung ke IP server DNS otoritatif milik masing-masing operator seluler:
+                            <ul style="margin-top: 0.5rem; margin-left: 1.25rem; font-family: var(--font-mono); font-size: 0.78rem;">
+                                <li><strong>Telkomsel:</strong> <code>180.250.247.1</code></li>
+                                <li><strong>XL Axiata:</strong> <code>202.152.165.2</code></li>
+                                <li><strong>IM3 Indosat:</strong> <code>36.86.63.185</code></li>
+                                <li><strong>Tri (3):</strong> <code>10.19.0.1</code></li>
+                            </ul>
+                            Jika domain dialihkan ke IP sinkhole (bukan IP asli server/Cloudflare Anda), sistem seketika menandainya sebagai <strong>BLOCKED</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docs-step-item">
+                    <div class="docs-step-number">B</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Inspeksi HTTP Redirect & Body Signatures</div>
+                        <div class="docs-step-desc">
+                            Sistem melakukan koneksi HTTP/HTTPS dan menganalisis apakah terjadi pengalihan (*redirect*) ke portal blokir seperti <code>internetpositif.id</code>, <code>uzone.id</code>, <code>siteblocked.xl.co.id</code>, atau mengandung kata kunci HTML Nawala/Kominfo.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docs-step-item">
+                    <div class="docs-step-number">C</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Pemeriksaan Berkala Otomatis (Background Scheduler)</div>
+                        <div class="docs-step-desc">
+                            Mesin penjadwal berjalan di latar belakang setiap <strong>5 menit sekali</strong> secara nonstop (*continuous loop*). Jika terjadi perubahan status pada domain (misal dari normal menjadi terblokir), sistem langsung mencatatnya ke <strong>Riwayat Status</strong> dan mengirimkan alert darurat ke Telegram.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TUTORIAL SETUP BOT TELEGRAM -->
+        <section id="telegram-bot" class="docs-card">
+            <h2 class="docs-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-indigo);"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                2. Tutorial Lengkap Setup Bot Telegram
+            </h2>
+            <p class="docs-subtitle">
+                Panduan langkah demi langkah mengintegrasikan Bot Telegram agar Anda dan tim menerima pemberitahuan instan saat domain terblokir atau terkena Suspected Phishing.
+            </p>
+
+            <div class="docs-step-list">
+                <!-- Langkah 1 -->
+                <div class="docs-step-item">
+                    <div class="docs-step-number">1</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Buat Bot Baru via @BotFather di Telegram</div>
+                        <div class="docs-step-desc">
+                            1. Buka aplikasi Telegram di HP atau Laptop Anda.<br>
+                            2. Cari akun resmi <strong>@BotFather</strong> (pastikan yang memiliki centang biru terverifikasi).<br>
+                            3. Ketik perintah:
+                            <div class="code-snippet"><code>/newbot</code></div>
+                            4. Masukkan nama tampilan untuk bot Anda, misalnya: <code>Nawala Sentinel Alert</code>.<br>
+                            5. Masukkan username unik yang wajib berakhiran <code>bot</code>, misalnya: <code>tokosaya_alert_bot</code>.<br>
+                            6. BotFather akan memberikan <strong>HTTP API Token</strong>. Contoh:
+                            <div class="code-snippet"><code>7412345678:AAFl8B_abcdef123456789xyz987654321</code></div>
+                            <em>Salin dan simpan token ini dengan aman.</em>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 2 -->
+                <div class="docs-step-item">
+                    <div class="docs-step-number">2</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Dapatkan Telegram Chat ID Anda atau ID Grup Tim</div>
+                        <div class="docs-step-desc">
+                            <strong>A. Jika Notifikasi Dikirim ke Chat Pribadi:</strong><br>
+                            - Buka bot Anda yang baru dibuat, lalu klik <strong>Start</strong>.<br>
+                            - Cari bot pembantu <strong>@getmyid_bot</strong> atau <strong>@userinfobot</strong> di Telegram, lalu ketik <code>/start</code>.<br>
+                            - Salin nomor <strong>Your user ID</strong> (misal: <code>123456789</code>).<br><br>
+
+                            <strong>B. Jika Notifikasi Dikirim ke Grup / Channel Tim:</strong><br>
+                            - Buat grup Telegram baru, lalu undang bot Anda ke dalam grup tersebut.<br>
+                            - Jadikan bot Anda sebagai <strong>Administrator</strong> grup.<br>
+                            - Undang bot <strong>@getmyid_bot</strong> ke dalam grup, bot akan menampilkan <strong>Current chat ID</strong> yang berawalan minus (contoh: <code>-1001987654321</code>).
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 3 -->
+                <div class="docs-step-item">
+                    <div class="docs-step-number">3</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Masukkan Konfigurasi di Halaman Pengaturan</div>
+                        <div class="docs-step-desc">
+                            1. Buka menu <strong>Pengaturan</strong> di panel NawalaSentinel.<br>
+                            2. Masukkan <strong>Telegram Bot Token</strong> pada kolom yang tersedia.<br>
+                            3. Masukkan <strong>Telegram Chat ID</strong> (misal: <code>123456789</code> atau <code>-1001987654321</code>).<br>
+                            4. Pastikan sakelar <strong>Notifikasi Telegram Otomatis</strong> dalam posisi aktif (*ON*).<br>
+                            5. Klik tombol <strong>Simpan Pengaturan</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 4 -->
+                <div class="docs-step-item">
+                    <div class="docs-step-number">4</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Uji Coba Pengiriman Notifikasi</div>
+                        <div class="docs-step-desc">
+                            Klik tombol <strong>Tes Koneksi Telegram</strong> di menu Pengaturan. Jika pengaturan Anda sudah benar, bot akan langsung mengirimkan pesan uji coba ke Telegram Anda dalam hitungan detik!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="callout-box success" style="margin-top: 1.5rem;">
+                <strong>Contoh Notifikasi Alert yang Akan Anda Terima:</strong>
+                <pre style="background: transparent; color: inherit; font-family: var(--font-mono); font-size: 0.76rem; margin-top: 0.5rem; white-space: pre-wrap;">
+🚨 <b>ALERT: DOMAIN TERBLOKIR NAWALA!</b> 🚨
+
+🌐 <b>Domain:</b> target-jualan.com
+📱 <b>Operator:</b> Telkomsel
+🔄 <b>Status ISP:</b> NORMAL -> <b>TERBLOKIR (BLOCKED)</b>
+🛡️ <b>Status Cloudflare:</b> ⚠️ <b>SUSPECTED PHISHING</b>
+🚨 <b>PERHATIAN GANDA:</b> Domain ini terblokir Nawala ISP SEKALIGUS terkena Suspected Phishing di Cloudflare!
+🔍 <b>Keterangan:</b> DNS Sinkhole IP terdeteksi (180.250.247.1) via Telkomsel DNS
+⏰ <i>Waktu Deteksi: 2026-09-20 01:25:00 WIB</i></pre>
+            </div>
+        </section>
+
+        <!-- 3. CLOUDFLARE SUSPECTED PHISHING -->
+        <section id="cloudflare-phishing" class="docs-card">
+            <h2 class="docs-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-rose);"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                3. Cloudflare Suspected Phishing (Penyebab & Solusi)
+            </h2>
+            <p class="docs-subtitle">
+                Mengapa domain jualan landing page iklan Facebook sering terkena peringatan ini, dan bagaimana menanganinya?
+            </p>
+
+            <div class="callout-box warning">
+                <strong>Gejala:</strong> Pengunjung yang mengeklik iklan Anda mendapati halaman peringatan merah dengan judul: <em>"Warning - Suspected Phishing: This website has been reported for potential phishing."</em>
+            </div>
+
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-top: 1rem; margin-bottom: 0.5rem;">Mengapa Ini Terjadi pada Landing Page FB Ads?</h3>
+            <ol style="color: var(--text-secondary); font-size: 0.82rem; line-height: 1.6; margin-left: 1.25rem;">
+                <li><strong>Deteksi Otomatis AI Cloudflare terhadap Form Input:</strong> Jika landing page memiliki formulir kontak, WhatsApp checkout, atau kolom login yang menyerupai form login portal populer, algoritma anti-abuse Cloudflare dapat salah mengidentifikasinya (*false positive*) sebagai situs phishing.</li>
+                <li><strong>Lonjakan Trafik Instan pada Domain Baru:</strong> Domain baru yang didaftarkan beberapa hari lalu dan langsung menerima ribuan klik dari Facebook Ads akan memicu filter reputasi Cloudflare.</li>
+                <li><strong>Laporan Kompetitor / Pengguna Facebook:</strong> Beberapa pengguna atau kompetitor mungkin sengaja menekan tombol "Report Ad/Site" sehingga memicu interstitial Cloudflare secara otomatis.</li>
+            </ol>
+
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-top: 1.25rem; margin-bottom: 0.5rem;">Langkah Mengatasi & Menghilangkan Flag Phishing:</h3>
+            <div class="docs-step-list">
+                <div class="docs-step-item">
+                    <div class="docs-step-number">1</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Ajukan Review Banding (False Positive) ke Cloudflare</div>
+                        <div class="docs-step-desc">
+                            Buka halaman pelaporan resmi Cloudflare Trust & Safety:
+                            <div class="code-snippet"><code>https://abuse.cloudflare.com/</code></div>
+                            Pilih opsi <em>"Report a false positive / Phishing Review"</em>, jelaskan bahwa domain tersebut adalah website toko online/bisnis resmi Anda, bukan situs pencurian kredensial. Cloudflare biasanya melepas flag dalam 12-24 jam.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docs-step-item">
+                    <div class="docs-step-number">2</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Gunakan Kolom STATUS CF di Dashboard</div>
+                        <div class="docs-step-desc">
+                            NawalaSentinel menyediakan kolom khusus <strong>STATUS CF</strong> berdampingan dengan <strong>STATUS NAWALA</strong>. Dengan demikian, jika domain Anda aman di operator seluler tetapi terkena Cloudflare Phishing (atau sebaliknya), Anda bisa mengetahuinya seketika sebelum saldo iklan FB Anda habis terbuang.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. FORMAT INPUT DOMAIN -->
+        <section id="input-domain" class="docs-card">
+            <h2 class="docs-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-emerald);"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                4. Format Input Domain & Upload File
+            </h2>
+            <p class="docs-subtitle">
+                Cara memasukkan ribuan link sekaligus dengan cepat dan aman.
+            </p>
+
+            <div class="docs-step-list">
+                <div class="docs-step-item">
+                    <div class="docs-step-number">A</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Paste Ribuan Baris Link (Editor Monospace)</div>
+                        <div class="docs-step-desc">
+                            Sistem secara cerdas membersihkan protokol (<code>https://</code>, <code>http://</code>) dan path URL (<code>/login</code>, <code>/promo.html</code>). Anda cukup paste daftar link apa adanya (1 link per baris):
+                            <div class="code-snippet">
+<code>https://toko-jualan.com
+subdomain.portalresmi.co.id
+https://landingpage-iklan.com/checkout
+domain-anda.id</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docs-step-item">
+                    <div class="docs-step-number">B</div>
+                    <div class="docs-step-content">
+                        <div class="docs-step-heading">Upload File CSV / TXT</div>
+                        <div class="docs-step-desc">
+                            Klik tombol <strong>Upload CSV / TXT</strong> pada panel editor. File Anda akan dibaca secara instan oleh browser dan dimuat ke dalam kotak teks tanpa perlu me-reload halaman.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. UPDATE GITHUB (AAPANEL) -->
+        <section id="update-github" class="docs-card">
+            <h2 class="docs-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-amber);"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                5. Update Aman via GitHub (aaPanel Zero-Downtime Pipeline)
+            </h2>
+            <p class="docs-subtitle">
+                Bagaimana memperbarui sistem langsung dari GitHub di aaPanel tanpa merusak database dan tanpa mematikan website?
+            </p>
+
+            <div class="callout-box info">
+                <strong>Cara Kerja Tombol Update di Menu Pengaturan:</strong><br>
+                1. Mengaktifkan <strong>Maintenance Lock</strong> di memori agar background task pemindaian tidak bentrok saat proses update berlangsung.<br>
+                2. Menjalankan <code>git fetch</code> & <code>git pull origin main</code> untuk mengambil commit terbaru dari repositori GitHub Anda.<br>
+                3. Menjalankan <code>init_db()</code> secara otomatis untuk menambahkan kolom baru pada database SQLite tanpa menghapus data domain yang sudah ada.<br>
+                4. Mengirim sinyal <strong>graceful reload</strong> ke worker proses server tanpa downtime (pengunjung tetap dapat mengakses website).
+            </div>
+
+            <div class="callout-box warning">
+                <strong>Rencana Kedepan (Keamanan Produksi):</strong><br>
+                Untuk mencegah orang lain menekan tombol pembaruan secara sembarangan di server produksi, sistem telah dirancang untuk menerapkan verifikasi <strong>Password Administrator</strong> dan <strong>6-digit Google Authenticator OTP (2FA)</strong> sebelum perintah update dapat dieksekusi.
+            </div>
+        </section>
+
+        <!-- 6. FAQ -->
+        <section id="faq" class="docs-card">
+            <h2 class="docs-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-sky);"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                6. Pertanyaan Umum & Troubleshooting (FAQ)
+            </h2>
+
+            <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem;">
+                <div style="background: rgba(14, 14, 17, 0.6); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <h4 style="font-size: 0.92rem; font-weight: 600; color: #ffffff; margin-bottom: 0.35rem;">Q: Mengapa kolom latency Telkomsel / XL bertuliskan ms (misal 45ms)?</h4>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
+                        A: Latency (milidetik) menunjukkan seberapa cepat server DNS atau gateway operator seluler tersebut merespons permintaan pengecekan domain Anda. Nilai di bawah 100ms tergolong sangat cepat.
+                    </p>
+                </div>
+
+                <div style="background: rgba(14, 14, 17, 0.6); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <h4 style="font-size: 0.92rem; font-weight: 600; color: #ffffff; margin-bottom: 0.35rem;">Q: Mengapa waktu di seluruh panel menggunakan WIB?</h4>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
+                        A: Sistem telah distandarisasi menggunakan zona waktu <strong>Asia/Jakarta (WIB, UTC+7)</strong>. Dengan demikian, waktu terblokir dan catatan log sinkron secara akurat dengan jam operasional bisnis dan iklan Anda di Indonesia, tidak tertinggal 7 jam seperti standar UTC internasional.
+                    </p>
+                </div>
+
+                <div style="background: rgba(14, 14, 17, 0.6); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <h4 style="font-size: 0.92rem; font-weight: 600; color: #ffffff; margin-bottom: 0.35rem;">Q: Bagaimana jika bot Telegram tidak mengirimkan notifikasi?</h4>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
+                        A: Pastikan Anda telah mengklik tombol <strong>Start</strong> pada bot Anda di Telegram. Jika dikirim ke grup, pastikan bot telah dimasukkan ke dalam grup dan Chat ID yang dimasukkan berawalan tanda minus (<code>-</code>). Anda dapat menguji koneksi dengan tombol <em>"Tes Koneksi Telegram"</em> di halaman Pengaturan.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+// Highlight active sidebar navigation on scroll
+document.addEventListener('DOMContentLoaded', () => {
+    const sections = document.querySelectorAll('.docs-card');
+    const navLinks = document.querySelectorAll('.docs-nav-item a');
+
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop - 120;
+            if (window.pageYOffset >= sectionTop) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === `#${current}`) {
+                link.classList.add('active');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

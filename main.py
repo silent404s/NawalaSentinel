@@ -46,6 +46,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="Sistem Pemantauan Status Pemblokiran Domain Nawala & Internet Positif di Operator Telkomsel, XL, Tri, & IM3",
     version="1.0.0",
+    docs_url="/api-docs",
+    redoc_url=None,
     lifespan=lifespan
 )
 

@@ -1,172 +1,283 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — NawalaSentinel Domain Monitor{% endblock %}
-
+{% block title %}Bulk Nawala Checker — Utilitarian Dashboard{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="page-header">
     <div>
-        <h1 class="page-title">Dashboard Pemantauan</h1>
-        <p class="page-subtitle">Monitoring real-time status pemblokiran domain di jaringan Telkomsel, XL, Tri, & IM3</p>
+        <h1 class="page-title">Bulk Nawala Checker</h1>
+        <p class="page-subtitle">Pemeriksaan dan audit pemblokiran ISP real-time (Telkomsel, XL, IM3, Tri)</p>
     </div>
-    <div style="display: flex; gap: 0.75rem;">
+    <div class="page-actions">
         <button id="btnCheckNow" class="btn btn-primary">
-            ⚡ Cek Massal Sekarang
+            <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            Pindai Massal Sekarang
         </button>
         <a href="/api/export" class="btn btn-secondary" target="_blank">
-            📥 Ekspor Laporan (CSV)
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Ekspor CSV
         </a>
     </div>
 </div>
 
-<!-- Countdown Schedule Banner -->
-<div class="glass-card" style="margin-bottom: 1.5rem; padding: 0.85rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-left: 4px solid var(--accent-indigo);">
-    <div style="display: flex; align-items: center; gap: 0.85rem;">
-        <span style="font-size: 1.4rem;">⏱️</span>
-        <div>
-            <div style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Penjadwalan Pengecekan Otomatis</div>
-            <div style="font-size: 0.88rem; color: var(--text-muted);">Pencekan otomatis seluruh domain setiap {{ check_interval_minutes }} menit di background</div>
+<!-- Ringkasan Metrik di Atas Tabel (Linear Summary Bar) -->
+<div class="metrics-strip">
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Total Domain</span>
         </div>
+        <div class="metric-val">{{ stats.total }}</div>
     </div>
-    <div style="text-align: right;">
-        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Waktu Tersisa:</div>
-        <div id="countdownTimer" data-seconds="{{ next_check_seconds }}" style="font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 800; color: var(--accent-cyan);">
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Jumlah Terblokir</span>
+            <span class="metric-rate blocked">{{ stats.blocked }}</span>
+        </div>
+        <div class="metric-val" style="color: var(--status-blocked-text);">{{ stats.blocked }}</div>
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Suspected Phishing</span>
+            <span class="metric-rate phishing">{{ stats.phishing }}</span>
+        </div>
+        <div class="metric-val" style="color: #fb7185;">{{ stats.phishing }}</div>
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Rasio Pemblokiran</span>
+        </div>
+        {% if stats.block_ratio > 0 %}
+        <div class="metric-val" style="color: var(--status-blocked-text);">
+            {{ stats.block_ratio }}%
+        </div>
+        {% else %}
+        <div class="metric-val" style="color: var(--status-normal-text);">
+            {{ stats.block_ratio }}%
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Domain Aman</span>
+            <span class="metric-rate normal">{{ stats.normal }}</span>
+        </div>
+        <div class="metric-val" style="color: var(--status-normal-text);">{{ stats.normal }}</div>
+    </div>
+
+    <div class="metric-cell">
+        <div class="metric-header">
+            <span class="metric-label">Jadwal Background</span>
+        </div>
+        <div class="metric-val countdown-timer-display" id="countdownTimer" data-seconds="{{ next_check_seconds }}" style="font-size: 1.15rem; color: var(--text-muted);">
             00m 00s
         </div>
     </div>
 </div>
 
-<!-- Stats Counter Grid -->
-
-<div class="stats-grid">
-    <div class="glass-card stat-card">
-        <div>
-            <div class="stat-label">Total Domain</div>
-            <div class="stat-val" style="color: #ffffff;">{{ stats.total }}</div>
+<!-- Compact Monospace Batch Input Console -->
+<div class="console-panel">
+    <div class="console-header">
+        <div class="console-title">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            Input Batch / Paste Ribuan Domain
         </div>
-        <div class="stat-icon" style="background: rgba(255,255,255,0.08); color: #ffffff;">🌐</div>
+        <div class="console-counter" id="domainCounter">0 domain terdeteksi</div>
     </div>
+    <div class="console-body">
+        <form id="addTextForm">
+            <textarea id="rawDomainsTextarea" name="raw_domains" class="console-textarea" placeholder="Paste ribuan link atau domain di sini (1 per baris)...&#10;example.com&#10;sub.domain.co.id&#10;https://target-portal.com" required></textarea>
+            <input type="hidden" name="category" value="General">
+            
+            <div class="console-toolbar">
+                <div class="console-file-drop">
+                    <label class="console-file-label" for="fileInputDirect">
+                        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                        Upload CSV / TXT
+                    </label>
+                    <input type="file" id="fileInputDirect" accept=".txt,.csv" style="display: none;">
+                    <span id="fileSelectedName" style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);"></span>
+                </div>
 
-    <div class="glass-card stat-card">
-        <div>
-            <div class="stat-label">Domain Aktif (Normal)</div>
-            <div class="stat-val" style="color: var(--status-normal);">{{ stats.normal }}</div>
-        </div>
-        <div class="stat-icon" style="background: var(--status-normal-bg); color: var(--status-normal);">✅</div>
-    </div>
-
-    <div class="glass-card stat-card">
-        <div>
-            <div class="stat-label">Terblokir Total</div>
-            <div class="stat-val" style="color: var(--status-blocked);">{{ stats.blocked }}</div>
-        </div>
-        <div class="stat-icon" style="background: var(--status-blocked-bg); color: var(--status-blocked);">🚨</div>
-    </div>
-
-    <div class="glass-card stat-card">
-        <div>
-            <div class="stat-label">Terblokir Sebagian (Mixed)</div>
-            <div class="stat-val" style="color: var(--status-mixed);">{{ stats.mixed }}</div>
-        </div>
-        <div class="stat-icon" style="background: var(--status-mixed-bg); color: var(--status-mixed);">⚠️</div>
+                <button type="submit" class="btn btn-primary">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Simpan & Proses Domain
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
-<!-- Operator Breakdown Cards -->
-<div style="margin-bottom: 2rem;">
-    <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-secondary);">Status Pemblokiran Per Operator Seluler</h3>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-        <div class="glass-card" style="padding: 1.25rem;">
-            <div class="operator-badge op-badge-tsel">Telkomsel</div>
-            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
-                {{ stats.op_blocked.Telkomsel }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
-            </div>
-        </div>
+<!-- Controls Bar (Segmented Filter & Instant Search) -->
+<div class="controls-bar">
+    <div class="segmented-filter">
+        <button type="button" class="segmented-btn active" data-filter="ALL">
+            Semua ({{ stats.total }})
+        </button>
+        <button type="button" class="segmented-btn" data-filter="BLOCKED">
+            Blokir ({{ stats.blocked }})
+        </button>
+        <button type="button" class="segmented-btn" data-filter="PHISHING">
+            Phishing ({{ stats.phishing }})
+        </button>
+        <button type="button" class="segmented-btn" data-filter="NORMAL">
+            Aman ({{ stats.normal }})
+        </button>
+        <button type="button" class="segmented-btn" data-filter="MIXED">
+            Sebagian ({{ stats.mixed }})
+        </button>
+        <button type="button" class="segmented-btn" data-filter="ERROR">
+            Error/Timeout
+        </button>
+    </div>
 
-        <div class="glass-card" style="padding: 1.25rem;">
-            <div class="operator-badge op-badge-xl">XL Axiata</div>
-            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
-                {{ stats.op_blocked.XL }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
-            </div>
-        </div>
-
-        <div class="glass-card" style="padding: 1.25rem;">
-            <div class="operator-badge op-badge-im3">IM3 Indosat</div>
-            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
-                {{ stats.op_blocked.IM3 }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
-            </div>
-        </div>
-
-        <div class="glass-card" style="padding: 1.25rem;">
-            <div class="operator-badge op-badge-tri">Tri (3)</div>
-            <div style="font-size: 1.8rem; font-weight: 800; margin-top: 0.5rem; color: #ef4444;">
-                {{ stats.op_blocked.Tri }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Terblokir</span>
-            </div>
-        </div>
+    <div class="filter-search-box">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="tableInstantSearch" class="filter-search-input" placeholder="Filter domain seketika...">
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;" class="dashboard-sections">
-    <!-- Domain Table Preview -->
-    <div class="glass-card" style="padding: 0;">
-        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="font-size: 1.05rem; font-weight: 700;">Domain Terbaru Dipantau</h3>
-            <a href="/domains" style="color: var(--accent-indigo); text-decoration: none; font-size: 0.88rem; font-weight: 600;">Lihat Semua &rarr;</a>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Domain / Subdomain</th>
-                        <th>Kategori</th>
-                        <th>Status Utama</th>
-                        <th>Terakhir Dicek</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for domain in domains %}
-                    <tr>
-                        <td class="domain-name-cell">{{ domain.name }}</td>
-                        <td><span style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">{{ domain.category }}</span></td>
-                        <td>
-                            <span class="status-pill {{ domain.overall_status }}">
-                                {% if domain.overall_status == 'NORMAL' %}✅ Normal{% elif domain.overall_status == 'BLOCKED' %}🚨 Terblokir{% elif domain.overall_status == 'MIXED' %}⚠️ Mixed{% else %}⏳ Unchecked{% endif %}
+<!-- High-Density Compact Data Table -->
+<div class="table-panel">
+    <div class="table-responsive">
+        <table class="compact-table" id="domainsDataTable">
+            <thead>
+                <tr>
+                    <th>Domain / Subdomain</th>
+                    <th>Status Nawala</th>
+                    <th>STATUS CF</th>
+                    <th>Telkomsel</th>
+                    <th>XL Axiata</th>
+                    <th>IM3 Indosat</th>
+                    <th>Tri (3)</th>
+                    <th>Terakhir Dicek</th>
+                    <th style="text-align: right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for domain in domains %}
+                {% set op_dict = op_results_map.get(domain.id, {}) %}
+                <tr class="table-row-item" data-status="{{ domain.overall_status }}" data-cf="{{ domain.cf_status }}" data-domain="{{ domain.name|lower }}">
+                    <td>
+                        <span class="cell-domain">{{ domain.name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge-status {{ domain.overall_status }}">
+                            <span class="badge-dot"></span>
+                            {{ domain.overall_status }}
+                        </span>
+                    </td>
+
+                    <!-- STATUS CF -->
+                    <td>
+                        {% if domain.cf_status == 'PHISHING' %}
+                            <span class="badge-status PHISHING" title="{{ domain.cf_reason or 'Cloudflare Suspected Phishing' }}">
+                                <span class="badge-dot"></span>
+                                PHISHING
                             </span>
-                        </td>
-                        <td style="color: var(--text-muted); font-size: 0.83rem;">
-                            {% if domain.last_checked_at %}{{ domain.last_checked_at.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}Belum dicek{% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Belum ada domain terdaftar. <a href="/domains" style="color: var(--accent-indigo);">Tambah Domain Massal &rarr;</a></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+                        {% elif domain.cf_status == 'CLEAN' or domain.cf_status == 'NORMAL' %}
+                            <span class="badge-status NORMAL" title="Cloudflare Bersih / Normal">
+                                <span class="badge-dot"></span>
+                                NORMAL
+                            </span>
+                        {% else %}
+                            <span class="badge-status UNCHECKED">
+                                <span class="badge-dot"></span>
+                                -
+                            </span>
+                        {% endif %}
+                    </td>
 
-    <!-- Recent Alerts / Activity Feed -->
-    <div class="glass-card">
-        <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem;">📜 Aktivitas Perubahan Terbaru</h3>
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-            {% for log in recent_logs %}
-            <div style="background: rgba(11, 15, 25, 0.5); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600;">{{ log.domain_name }}</span>
-                    <span class="operator-badge {% if log.operator == 'Telkomsel' %}op-badge-tsel{% elif log.operator == 'XL' %}op-badge-xl{% elif log.operator == 'IM3' %}op-badge-im3{% else %}op-badge-tri{% endif %}">{{ log.operator }}</span>
-                </div>
-                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
-                    Perubahan: <span style="color: var(--text-muted);">{{ log.previous_status }}</span> &rarr; 
-                    <strong style="color: {% if log.new_status == 'BLOCKED' %}#ef4444{% else %}#10b981{% endif %};">{{ log.new_status }}</strong>
-                </div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ log.timestamp.strftime('%H:%M:%S - %d %b %Y') }}</div>
-            </div>
-            {% else %}
-            <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">Belum ada riwayat perubahan status.</div>
-            {% endfor %}
-        </div>
+                    <!-- Telkomsel -->
+                    <td>
+                        {% set tsel = op_dict.get('Telkomsel') %}
+                        {% if tsel %}
+                            <div class="isp-cell">
+                                <span class="badge-status {{ tsel.status }}" title="{{ tsel.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ tsel.status }}
+                                </span>
+                                <span class="isp-latency">{{ tsel.latency_ms }}ms</span>
+                            </div>
+                        {% else %}
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- XL -->
+                    <td>
+                        {% set xl = op_dict.get('XL') %}
+                        {% if xl %}
+                            <div class="isp-cell">
+                                <span class="badge-status {{ xl.status }}" title="{{ xl.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ xl.status }}
+                                </span>
+                                <span class="isp-latency">{{ xl.latency_ms }}ms</span>
+                            </div>
+                        {% else %}
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- IM3 -->
+                    <td>
+                        {% set im3 = op_dict.get('IM3') %}
+                        {% if im3 %}
+                            <div class="isp-cell">
+                                <span class="badge-status {{ im3.status }}" title="{{ im3.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ im3.status }}
+                                </span>
+                                <span class="isp-latency">{{ im3.latency_ms }}ms</span>
+                            </div>
+                        {% else %}
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Tri -->
+                    <td>
+                        {% set tri = op_dict.get('Tri') %}
+                        {% if tri %}
+                            <div class="isp-cell">
+                                <span class="badge-status {{ tri.status }}" title="{{ tri.block_reason }}">
+                                    <span class="badge-dot"></span>
+                                    {{ tri.status }}
+                                </span>
+                                <span class="isp-latency">{{ tri.latency_ms }}ms</span>
+                            </div>
+                        {% else %}
+                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
+                        {% if domain.last_checked_at %}{{ domain.last_checked_at|wib_datetime }}{% else %}Belum dicek{% endif %}
+                    </td>
+
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button type="button" class="btn btn-secondary btn-xs btn-recheck-domain" data-id="{{ domain.id }}" title="Cek Ulang">
+                            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                        <button type="button" class="btn btn-danger btn-xs btn-delete-domain" data-id="{{ domain.id }}" data-name="{{ domain.name }}" title="Hapus">
+                            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="emptyTableRow">
+                    <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                        Tidak ada domain terdaftar. Masukkan ribuan link pada input console di atas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}

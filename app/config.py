@@ -12,11 +12,14 @@ class Settings:
     DEBUG: bool = os.getenv("DEBUG", "True").lower() in ("true", "1", "t")
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "nawalasentinel-secret-key-3908420934")
     
+    # Mode Pengujian Lokal / Simulasi (Memungkinkan pengujian seluruh status di localhost tanpa modem 4G fisik)
+    LOCAL_TEST_MODE: bool = os.getenv("LOCAL_TEST_MODE", "False").lower() in ("true", "1", "t")
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/nawalasentinel.db")
 
-    
     # Scheduler & Parallel Concurrency
     CHECK_INTERVAL_MINUTES: int = int(os.getenv("CHECK_INTERVAL_MINUTES", "5"))
     CONCURRENT_CHECKS: int = int(os.getenv("CONCURRENT_CHECKS", "30"))
@@ -25,7 +28,6 @@ class Settings:
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "2000")) # Contoh 2.000 domain per sesi
     CHUNK_DELAY_SECONDS: float = float(os.getenv("CHUNK_DELAY_SECONDS", "5.0")) # Jeda jeda antar sesi dalam detik
 
-    
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -57,8 +59,18 @@ class Settings:
     # Daftar IP Sinkhole / Blocked Response yang umum digunakan ISP Indonesia
     KNOWN_SINKHOLE_IPS = [
         "180.250.247.",  # Telkomsel Nawala/TrustPositif Sinkhole
+        "180.250.",      # Telkomsel Range
+        "180.240.",      # Telkom Range
         "118.98.",       # Telkomsel Sinkhole Range
         "202.152.165.",  # XL Block Sinkhole
+        "112.215.",      # XL Sinkhole Range
+        "36.86.",        # Indosat Ooredoo / IM3 Sinkhole Range
+        "114.4.",        # Indosat Sinkhole Range
+        "114.5.",        # Indosat Sinkhole Range
+        "202.155.",      # Indosat DNS/Proxy Range
+        "103.19.",       # Moratel / Smartfren Range
+        "103.247.",      # Smartfren Sinkhole Range
+        "180.131.",      # DNS Nawala Sinkhole IP Range
         "10.11.",        # Private ISP Sinkhole
         "10.19.",        # Private ISP Sinkhole
         "127.0.0.1",     # Loopback sinkhole
@@ -69,17 +81,28 @@ class Settings:
     BLOCKPAGE_SIGNATURES = [
         "internetpositif",
         "internet positif",
+        "internetpositif.id",
         "trustpositif",
         "trust positif",
+        "trustpositif.komdigi.go.id",
         "pos-blokir",
         "siteblocked",
         "mercusuar",
         "uzone.id",
         "internetsehat",
         "nawala",
-        "blokir",
-        "blocked",
-        "kominfo",
+        "request rejected",
+        "the requested url was rejected",
+    ]
+
+    # Signature Khusus Cloudflare & Browser Anti-Phishing Warnings
+    PHISHING_SIGNATURES = [
+        "suspected phishing",
+        "reported for potential phishing",
+        "phishing is when a site attempts to steal sensitive information",
+        "deceptive site ahead",
+        "the site ahead contains harmful programs",
+        "peringatan: terindikasi phishing",
     ]
 
 settings = Settings()

@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Index
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.utils.timezone import now_jakarta_naive
 
 class User(Base):
     """
@@ -16,7 +17,7 @@ class User(Base):
     domain_quota = Column(Integer, default=10) # Kelipatan 10
     telegram_chat_id = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jakarta_naive)
 
     domains = relationship("Domain", back_populates="user", cascade="all, delete-orphan")
 
@@ -42,8 +43,10 @@ class Domain(Base):
     name = Column(String(255), unique=True, nullable=False, index=True) # e.g. domain.com or sub.domain.com
     category = Column(String(100), default="General", index=True)
     overall_status = Column(String(50), default="UNCHECKED", index=True) # UNCHECKED, NORMAL, BLOCKED, MIXED
+    cf_status = Column(String(50), default="CLEAN", index=True) # CLEAN, PHISHING, UNCHECKED
+    cf_reason = Column(Text, nullable=True)
     last_checked_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jakarta_naive)
 
     # Relationship dengan hasil pengecekan per operator & log
     user = relationship("User", back_populates="domains")
@@ -57,6 +60,8 @@ class Domain(Base):
             "name": self.name,
             "category": self.category,
             "overall_status": self.overall_status,
+            "cf_status": self.cf_status,
+            "cf_reason": self.cf_reason,
             "last_checked_at": self.last_checked_at.isoformat() if self.last_checked_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
@@ -75,7 +80,7 @@ class CheckResult(Base):
     resolved_ips = Column(String(255), nullable=True) # e.g. 104.21.32.1
     block_reason = Column(Text, nullable=True) # e.g. "DNS Sinkhole IP: 180.250.247.1" or "HTTP Redirect: internetpositif.id"
     latency_ms = Column(Float, default=0.0)
-    checked_at = Column(DateTime, default=datetime.utcnow)
+    checked_at = Column(DateTime, default=now_jakarta_naive)
 
     domain = relationship("Domain", back_populates="results")
 
@@ -105,7 +110,7 @@ class StatusLog(Base):
     previous_status = Column(String(50), nullable=False)
     new_status = Column(String(50), nullable=False)
     reason = Column(Text, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, default=now_jakarta_naive, index=True)
 
     domain = relationship("Domain", back_populates="logs")
 

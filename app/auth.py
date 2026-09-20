@@ -35,19 +35,31 @@ def generate_activation_token() -> str:
     token = ''.join(secrets.choice(chars) for _ in range(6))
     return f"NS-{token}"
 
+from app.config import settings
+import logging
+
+logger = logging.getLogger("auth")
+
 # Session dependencies
 async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)):
     user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+    if user_id:
+        stmt = select(User).where(User.id == user_id, User.is_active == True)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user:
+            return user
     
-    stmt = select(User).where(User.id == user_id, User.is_active == True)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid session")
-    return user
+    # Fallback ke akun superadmin aktif hanya jika DEBUG mode aktif (untuk localhost)
+    if settings.DEBUG:
+        stmt_admin = select(User).where(User.role == "SUPERADMIN", User.is_active == True).order_by(User.id.asc()).limit(1)
+        res_admin = await db.execute(stmt_admin)
+        admin_user = res_admin.scalar_one_or_none()
+        if admin_user:
+            request.session["user_id"] = admin_user.id
+            return admin_user
+
+    raise HTTPException(status_code=401, detail="Not authenticated")
 
 async def get_current_superadmin(current_user: User = Depends(get_current_user)):
     if current_user.role != "SUPERADMIN":
