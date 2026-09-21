@@ -40,6 +40,11 @@ def format_wib(dt: Optional[datetime], fmt: str = "%d %b %Y %H:%M WIB") -> str:
     """
     if dt is None:
         return "-"
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except Exception:
+            return dt
     return dt.strftime(fmt)
 
 def format_time_wib(dt: Optional[datetime]) -> str:
@@ -48,4 +53,9 @@ def format_time_wib(dt: Optional[datetime]) -> str:
     """
     if dt is None:
         return "-"
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except Exception:
+            return dt
     return dt.strftime("%H:%M:%S WIB")

@@ -142,31 +142,55 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Client-side Instant Segmented Filter & Search
+    // Client-side Instant Segmented Filter, Category Filter & Search
     const segmentedBtns = document.querySelectorAll(".segmented-btn[data-filter]");
+    const categoryFilterSelect = document.getElementById("categoryFilterSelect");
     const instantSearchInput = document.getElementById("tableInstantSearch");
-    const tableRows = document.querySelectorAll(".table-row-item");
 
     let currentFilter = "ALL";
+    let currentCategoryFilter = "ALL";
     let searchQuery = "";
 
+    function sortTableAlphabetically() {
+        const table = document.getElementById("domainsDataTable");
+        if (!table) return;
+        const tbody = table.querySelector("tbody");
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll(".table-row-item"));
+        rows.sort((a, b) => {
+            const domainA = (a.getAttribute("data-domain") || "").toLowerCase();
+            const domainB = (b.getAttribute("data-domain") || "").toLowerCase();
+            return domainA.localeCompare(domainB);
+        });
+        rows.forEach(row => tbody.appendChild(row));
+    }
+
     function applyTableFilter() {
+        const currentRows = document.querySelectorAll("#domainsDataTable tbody .table-row-item");
         let visibleCount = 0;
-        tableRows.forEach(row => {
+        currentRows.forEach(row => {
             const rowStatus = row.getAttribute("data-status") || "";
             const rowCf = row.getAttribute("data-cf") || "";
             const rowDomain = row.getAttribute("data-domain") || "";
+            const rowCategory = (row.getAttribute("data-category") || "").toLowerCase();
 
             const matchesStatus = (currentFilter === "ALL") ||
                                   (currentFilter === "ERROR" && (rowStatus === "TIMEOUT" || rowStatus === "ERROR")) ||
                                   (currentFilter === "PHISHING" && rowCf === "PHISHING") ||
                                   (rowStatus === currentFilter);
 
-            const matchesSearch = !searchQuery || rowDomain.includes(searchQuery);
+            const matchesCategory = (currentCategoryFilter === "ALL") || 
+                                    (rowCategory === currentCategoryFilter.toLowerCase());
 
-            if (matchesStatus && matchesSearch) {
+            const matchesSearch = !searchQuery || rowDomain.includes(searchQuery) || rowCategory.includes(searchQuery);
+
+            if (matchesStatus && matchesCategory && matchesSearch) {
                 row.style.display = "";
                 visibleCount++;
+                const numCell = row.querySelector(".cell-number");
+                if (numCell) {
+                    numCell.textContent = visibleCount;
+                }
             } else {
                 row.style.display = "none";
             }
@@ -175,9 +199,13 @@ document.addEventListener("DOMContentLoaded", () => {
         // Show / hide empty row if exists
         const emptyRow = document.getElementById("emptyTableRow");
         if (emptyRow) {
-            emptyRow.style.display = (visibleCount === 0 && tableRows.length > 0) ? "" : "none";
+            emptyRow.style.display = (visibleCount === 0 && currentRows.length > 0) ? "" : "none";
         }
     }
+
+    // Auto-sort alphabetically & apply initial numbering
+    sortTableAlphabetically();
+    applyTableFilter();
 
     if (segmentedBtns.length > 0) {
         segmentedBtns.forEach(btn => {
@@ -190,11 +218,59 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    if (categoryFilterSelect) {
+        categoryFilterSelect.addEventListener("change", () => {
+            currentCategoryFilter = categoryFilterSelect.value;
+            applyTableFilter();
+        });
+    }
+
     if (instantSearchInput) {
         instantSearchInput.addEventListener("input", (e) => {
             searchQuery = e.target.value.trim().toLowerCase();
             applyTableFilter();
         });
+    }
+
+    // Click-to-copy Domain Link with visual feedback
+    document.addEventListener("click", (e) => {
+        const copyTarget = e.target.closest(".clickable-copy");
+        if (copyTarget) {
+            const textToCopy = copyTarget.getAttribute("data-copy") || copyTarget.innerText.trim();
+            if (textToCopy) {
+                const onCopySuccess = () => {
+                    copyTarget.classList.add("copied");
+                    setTimeout(() => copyTarget.classList.remove("copied"), 1500);
+                    showToast(`Tersalin: ${textToCopy}`, "success");
+                };
+
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(textToCopy)
+                        .then(onCopySuccess)
+                        .catch(() => fallbackCopyText(textToCopy, onCopySuccess));
+                } else {
+                    fallbackCopyText(textToCopy, onCopySuccess);
+                }
+            }
+        }
+    });
+
+    function fallbackCopyText(text, cb) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand("copy");
+            if (cb) cb();
+        } catch (err) {
+            showToast("Gagal menyalin link.", "error");
+        }
+        document.body.removeChild(textArea);
     }
 
     // Background Countdown Scheduler Logic (Continuous Endless 5-min Loop)
@@ -317,44 +393,355 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Add Text / Batch Domains Form
+    // ==========================================================================
+    // Category Selection Pop-up Modal & Domain Batch Submission Flow
+    // ==========================================================================
     const addTextForm = document.getElementById("addTextForm");
-    if (addTextForm) {
-        addTextForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const formData = new FormData(addTextForm);
-            const btnSubmit = addTextForm.querySelector("button[type='submit']");
-            const originalHTML = btnSubmit.innerHTML;
+    const categoryModal = document.getElementById("categoryModal");
+    const btnCloseCategoryModal = document.getElementById("btnCloseCategoryModal");
+    const btnCancelCategoryModal = document.getElementById("btnCancelCategoryModal");
+    const btnConfirmCategoryModal = document.getElementById("btnConfirmCategoryModal");
+    const modalDomainCount = document.getElementById("modalDomainCount");
+    const modalCustomCategoryWrapper = document.getElementById("modalCustomCategoryWrapper");
+    const modalCustomCategoryInput = document.getElementById("modalCustomCategoryInput");
+    const categoryRadios = document.querySelectorAll('input[name="modal_category_choice"]');
 
-            btnSubmit.disabled = true;
-            btnSubmit.innerHTML = `<span class="spinner"></span> Memproses...`;
+    // Handle Category Radio Option Toggle in Modal
+    if (categoryRadios.length > 0) {
+        categoryRadios.forEach(radio => {
+            radio.addEventListener("change", () => {
+                document.querySelectorAll(".category-radio-item").forEach(item => item.classList.remove("selected"));
+                const parentLabel = radio.closest(".category-radio-item");
+                if (parentLabel) parentLabel.classList.add("selected");
+
+                if (radio.value === "__custom__") {
+                    if (modalCustomCategoryWrapper) {
+                        modalCustomCategoryWrapper.style.display = "block";
+                    }
+                    if (modalCustomCategoryInput) {
+                        modalCustomCategoryInput.focus();
+                    }
+                } else {
+                    if (modalCustomCategoryWrapper) {
+                        modalCustomCategoryWrapper.style.display = "none";
+                    }
+                }
+            });
+        });
+    }
+
+    // Modal Close Logic
+    const closeCategoryModal = () => {
+        if (categoryModal) categoryModal.style.display = "none";
+    };
+    if (btnCloseCategoryModal) btnCloseCategoryModal.addEventListener("click", closeCategoryModal);
+    if (btnCancelCategoryModal) btnCancelCategoryModal.addEventListener("click", closeCategoryModal);
+    if (categoryModal) {
+        categoryModal.addEventListener("click", (e) => {
+            if (e.target === categoryModal) closeCategoryModal();
+        });
+    }
+
+    // Intercept "Simpan & Proses Domain" to Show Category Pop-up Modal
+    if (addTextForm) {
+        addTextForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            const text = rawDomainsTextarea ? rawDomainsTextarea.value.trim() : "";
+            const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0 && l.includes("."));
+            if (lines.length === 0) {
+                showToast("Masukkan minimal 1 domain atau link valid terlebih dahulu!", "warning");
+                if (rawDomainsTextarea) rawDomainsTextarea.focus();
+                return;
+            }
+
+            if (categoryModal) {
+                if (modalDomainCount) {
+                    modalDomainCount.textContent = lines.length.toLocaleString();
+                }
+                categoryModal.style.display = "flex";
+            } else {
+                // Fallback if modal is absent
+                submitDomainBatch("General");
+            }
+        });
+    }
+
+    // Modal Confirm & Save Domain Execution
+    if (btnConfirmCategoryModal) {
+        btnConfirmCategoryModal.addEventListener("click", async () => {
+            const checkedRadio = document.querySelector('input[name="modal_category_choice"]:checked');
+            let chosenCategory = checkedRadio ? checkedRadio.value : "General";
+
+            if (chosenCategory === "__custom__") {
+                const customVal = modalCustomCategoryInput ? modalCustomCategoryInput.value.trim() : "";
+                if (!customVal) {
+                    showToast("Silakan ketik nama kategori baru Anda!", "warning");
+                    if (modalCustomCategoryInput) modalCustomCategoryInput.focus();
+                    return;
+                }
+                chosenCategory = customVal;
+            }
+
+            await submitDomainBatch(chosenCategory);
+        });
+    }
+
+    // Core Batch Domain Submission Helper
+    async function submitDomainBatch(categoryName) {
+        if (!addTextForm) return;
+
+        const originalHTML = btnConfirmCategoryModal ? btnConfirmCategoryModal.innerHTML : "";
+        if (btnConfirmCategoryModal) {
+            btnConfirmCategoryModal.disabled = true;
+            btnConfirmCategoryModal.innerHTML = `<span class="spinner"></span> Menyimpan...`;
+        }
+
+        const formData = new FormData(addTextForm);
+        formData.set("category", categoryName);
+
+        try {
+            const res = await fetch("/api/domains/add", {
+                method: "POST",
+                body: formData
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                if (data.added > 0) {
+                    if (categoryModal) categoryModal.style.display = "none";
+                    showToast(`Berhasil menyimpan ${data.added} domain ke kategori "${categoryName}".`, "success");
+                    addTextForm.reset();
+                    const fileSelected = document.getElementById("fileSelectedName");
+                    if (fileSelected) fileSelected.textContent = "";
+                    const domainCounterEl = document.getElementById("domainCounter");
+                    if (domainCounterEl) domainCounterEl.textContent = "0 domain terdeteksi";
+                    setTimeout(() => window.location.reload(), 900);
+                } else {
+                    showToast(data.message || "Tidak ada domain baru yang ditambahkan.", "warning");
+                    if (btnConfirmCategoryModal) {
+                        btnConfirmCategoryModal.disabled = false;
+                        btnConfirmCategoryModal.innerHTML = originalHTML;
+                    }
+                }
+            } else {
+                showToast("Gagal: " + (data.message || data.detail || "Terjadi kesalahan"), "error");
+                if (btnConfirmCategoryModal) {
+                    btnConfirmCategoryModal.disabled = false;
+                    btnConfirmCategoryModal.innerHTML = originalHTML;
+                }
+            }
+        } catch (err) {
+            showToast("Kesalahan koneksi jaringan saat menyimpan domain.", "error");
+            if (btnConfirmCategoryModal) {
+                btnConfirmCategoryModal.disabled = false;
+                btnConfirmCategoryModal.innerHTML = originalHTML;
+            }
+        }
+    }
+
+    // ==========================================
+    // SINGLE DOMAIN CATEGORY EDIT MODAL
+    // ==========================================
+    const editSingleCategoryModal = document.getElementById("editSingleCategoryModal");
+    const editSingleDomainName = document.getElementById("editSingleDomainName");
+    const editSingleDomainId = document.getElementById("editSingleDomainId");
+    const editSingleCategorySelect = document.getElementById("editSingleCategorySelect");
+    const editSingleCustomWrapper = document.getElementById("editSingleCustomWrapper");
+    const editSingleCustomInput = document.getElementById("editSingleCustomInput");
+    const btnCloseEditSingleModal = document.getElementById("btnCloseEditSingleModal");
+    const btnCancelEditSingleModal = document.getElementById("btnCancelEditSingleModal");
+    const btnConfirmEditSingleModal = document.getElementById("btnConfirmEditSingleModal");
+
+    // Open Single Domain Edit Modal on Category Badge Click
+    document.addEventListener("click", (e) => {
+        const badge = e.target.closest(".clickable-category-edit");
+        if (badge && editSingleCategoryModal) {
+            const domainId = badge.getAttribute("data-id");
+            const domainName = badge.getAttribute("data-name") || "Domain";
+            const currentCat = badge.getAttribute("data-category") || "General";
+
+            if (editSingleDomainId) editSingleDomainId.value = domainId;
+            if (editSingleDomainName) editSingleDomainName.textContent = domainName;
+
+            // Set select value
+            let foundOption = false;
+            if (editSingleCategorySelect) {
+                Array.from(editSingleCategorySelect.options).forEach(opt => {
+                    if (opt.value.toLowerCase() === currentCat.toLowerCase()) {
+                        opt.selected = true;
+                        foundOption = true;
+                    }
+                });
+
+                if (!foundOption) {
+                    editSingleCategorySelect.value = "__custom__";
+                    if (editSingleCustomWrapper) editSingleCustomWrapper.style.display = "block";
+                    if (editSingleCustomInput) editSingleCustomInput.value = currentCat;
+                } else {
+                    if (editSingleCustomWrapper) editSingleCustomWrapper.style.display = "none";
+                    if (editSingleCustomInput) editSingleCustomInput.value = "";
+                }
+            }
+
+            editSingleCategoryModal.style.display = "flex";
+        }
+    });
+
+    if (editSingleCategorySelect) {
+        editSingleCategorySelect.addEventListener("change", () => {
+            if (editSingleCategorySelect.value === "__custom__") {
+                if (editSingleCustomWrapper) editSingleCustomWrapper.style.display = "block";
+                if (editSingleCustomInput) {
+                    editSingleCustomInput.focus();
+                }
+            } else {
+                if (editSingleCustomWrapper) editSingleCustomWrapper.style.display = "none";
+            }
+        });
+    }
+
+    const closeEditSingleModal = () => {
+        if (editSingleCategoryModal) editSingleCategoryModal.style.display = "none";
+    };
+    if (btnCloseEditSingleModal) btnCloseEditSingleModal.addEventListener("click", closeEditSingleModal);
+    if (btnCancelEditSingleModal) btnCancelEditSingleModal.addEventListener("click", closeEditSingleModal);
+    if (editSingleCategoryModal) {
+        editSingleCategoryModal.addEventListener("click", (e) => {
+            if (e.target === editSingleCategoryModal) closeEditSingleModal();
+        });
+    }
+
+    if (btnConfirmEditSingleModal) {
+        btnConfirmEditSingleModal.addEventListener("click", async () => {
+            const domainId = editSingleDomainId ? editSingleDomainId.value : "";
+            if (!domainId) return;
+
+            let chosenCat = editSingleCategorySelect ? editSingleCategorySelect.value : "General";
+            if (chosenCat === "__custom__") {
+                const customVal = editSingleCustomInput ? editSingleCustomInput.value.trim() : "";
+                if (!customVal) {
+                    showToast("Silakan ketik nama kategori baru!", "warning");
+                    if (editSingleCustomInput) editSingleCustomInput.focus();
+                    return;
+                }
+                chosenCat = customVal;
+            }
+
+            const origHtml = btnConfirmEditSingleModal.innerHTML;
+            btnConfirmEditSingleModal.disabled = true;
+            btnConfirmEditSingleModal.innerHTML = `<span class="spinner"></span> Menyimpan...`;
 
             try {
-                const res = await fetch("/api/domains/add", {
+                const formData = new FormData();
+                formData.append("category", chosenCat);
+
+                const res = await fetch(`/api/domains/${domainId}/category`, {
                     method: "POST",
                     body: formData
                 });
                 const data = await res.json();
 
                 if (res.ok) {
-                    if (data.added > 0) {
-                        showToast(data.message, "success");
-                        addTextForm.reset();
-                        setTimeout(() => window.location.reload(), 1000);
-                    } else {
-                        showToast(data.message, "warning");
-                        btnSubmit.disabled = false;
-                        btnSubmit.innerHTML = originalHTML;
+                    showToast(data.message, "success");
+                    closeEditSingleModal();
+
+                    // Update row in table immediately
+                    const badge = document.querySelector(`.clickable-category-edit[data-id="${domainId}"]`);
+                    if (badge) {
+                        badge.setAttribute("data-category", chosenCat);
+                        const textSpan = badge.querySelector(".badge-category-text");
+                        if (textSpan) textSpan.textContent = chosenCat;
+                        const row = badge.closest(".table-row-item");
+                        if (row) row.setAttribute("data-category", chosenCat.toLowerCase());
                     }
+
+                    setTimeout(() => window.location.reload(), 600);
                 } else {
-                    showToast("Gagal: " + (data.message || data.detail || "Terjadi kesalahan"), "error");
-                    btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = originalHTML;
+                    showToast(data.message || "Gagal mengubah kategori.", "error");
                 }
             } catch (err) {
-                showToast("Kesalahan koneksi jaringan saat menyimpan domain.", "error");
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = originalHTML;
+                showToast("Kesalahan jaringan saat mengubah kategori.", "error");
+            } finally {
+                btnConfirmEditSingleModal.disabled = false;
+                btnConfirmEditSingleModal.innerHTML = origHtml;
+            }
+        });
+    }
+
+    // ==========================================
+    // GLOBAL RENAME CATEGORY MODAL
+    // ==========================================
+    const renameCategoryModal = document.getElementById("renameCategoryModal");
+    const btnOpenRenameCategoryModal = document.getElementById("btnOpenRenameCategoryModal");
+    const renameOldCategorySelect = document.getElementById("renameOldCategorySelect");
+    const renameNewCategoryInput = document.getElementById("renameNewCategoryInput");
+    const btnCloseRenameCategoryModal = document.getElementById("btnCloseRenameCategoryModal");
+    const btnCancelRenameCategoryModal = document.getElementById("btnCancelRenameCategoryModal");
+    const btnConfirmRenameCategoryModal = document.getElementById("btnConfirmRenameCategoryModal");
+
+    if (btnOpenRenameCategoryModal && renameCategoryModal) {
+        btnOpenRenameCategoryModal.addEventListener("click", () => {
+            renameCategoryModal.style.display = "flex";
+            if (renameNewCategoryInput) {
+                renameNewCategoryInput.value = "";
+                renameNewCategoryInput.focus();
+            }
+        });
+
+        const closeRenameModal = () => {
+            renameCategoryModal.style.display = "none";
+        };
+        if (btnCloseRenameCategoryModal) btnCloseRenameCategoryModal.addEventListener("click", closeRenameModal);
+        if (btnCancelRenameCategoryModal) btnCancelRenameCategoryModal.addEventListener("click", closeRenameModal);
+        renameCategoryModal.addEventListener("click", (e) => {
+            if (e.target === renameCategoryModal) closeRenameModal();
+        });
+    }
+
+    if (btnConfirmRenameCategoryModal) {
+        btnConfirmRenameCategoryModal.addEventListener("click", async () => {
+            const oldCat = renameOldCategorySelect ? renameOldCategorySelect.value.trim() : "";
+            const newCat = renameNewCategoryInput ? renameNewCategoryInput.value.trim() : "";
+
+            if (!oldCat || !newCat) {
+                showToast("Nama kategori lama dan baru harus diisi!", "warning");
+                if (renameNewCategoryInput) renameNewCategoryInput.focus();
+                return;
+            }
+
+            if (oldCat.toLowerCase() === newCat.toLowerCase()) {
+                showToast("Nama kategori baru tidak boleh sama dengan kategori lama!", "warning");
+                return;
+            }
+
+            const origHtml = btnConfirmRenameCategoryModal.innerHTML;
+            btnConfirmRenameCategoryModal.disabled = true;
+            btnConfirmRenameCategoryModal.innerHTML = `<span class="spinner"></span> Menyimpan...`;
+
+            try {
+                const formData = new FormData();
+                formData.append("old_category", oldCat);
+                formData.append("new_category", newCat);
+
+                const res = await fetch("/api/categories/rename", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast(data.message, "success");
+                    if (renameCategoryModal) renameCategoryModal.style.display = "none";
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    showToast(data.message || "Gagal mengubah nama kategori.", "error");
+                }
+            } catch (err) {
+                showToast("Kesalahan jaringan saat mengubah nama kategori.", "error");
+            } finally {
+                btnConfirmRenameCategoryModal.disabled = false;
+                btnConfirmRenameCategoryModal.innerHTML = origHtml;
             }
         });
     }
@@ -450,6 +837,134 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // ==========================================
+    // SCHEDULER & PERFORMANCE PRESETS & ESTIMATOR
+    // ==========================================
+    const checkIntervalInput = document.getElementById("check_interval");
+    const chunkSizeInput = document.getElementById("chunk_size");
+    const concurrentChecksInput = document.getElementById("concurrent_checks");
+    const chunkDelayInput = document.getElementById("chunk_delay");
+    const presetBtns = document.querySelectorAll(".preset-btn");
+
+    const estDuration = document.getElementById("estDuration");
+    const estCpuLoad = document.getElementById("estCpuLoad");
+    const estCycleFit = document.getElementById("estCycleFit");
+    const estKomdigiSafety = document.getElementById("estKomdigiSafety");
+
+    function updatePerformanceEstimates() {
+        if (!checkIntervalInput || !chunkSizeInput || !concurrentChecksInput || !chunkDelayInput) return;
+
+        const intervalMins = Math.max(1, parseInt(checkIntervalInput.value, 10) || 5);
+        const chunkSize = Math.max(10, parseInt(chunkSizeInput.value, 10) || 1000);
+        const concurrent = Math.max(5, parseInt(concurrentChecksInput.value, 10) || 30);
+        const delay = Math.max(0, parseFloat(chunkDelayInput.value) || 0);
+
+        // Simulation for 1.000 domains
+        const simTotal = 1000;
+        const totalBatches = Math.ceil(simTotal / chunkSize);
+        const avgSecPerDomain = 1.8; // average DNS + HTTP + TrustPositif latency with parallelism
+        const batchDuration = (Math.min(simTotal, chunkSize) / concurrent) * avgSecPerDomain;
+        const totalDelays = (totalBatches - 1) * delay;
+        const totalDurationSec = Math.round((totalBatches * batchDuration) + totalDelays);
+
+        if (estDuration) {
+            if (totalDurationSec < 60) {
+                estDuration.textContent = `~${totalDurationSec} detik`;
+            } else {
+                const mins = Math.floor(totalDurationSec / 60);
+                const secs = totalDurationSec % 60;
+                estDuration.textContent = `~${mins}m ${secs}s`;
+            }
+        }
+
+        if (estCpuLoad) {
+            if (concurrent <= 35) {
+                estCpuLoad.textContent = "Ringan (< 15% CPU)";
+                estCpuLoad.style.color = "#34d399";
+            } else if (concurrent <= 60) {
+                estCpuLoad.textContent = "Sedang (15 - 30% CPU)";
+                estCpuLoad.style.color = "#38bdf8";
+            } else {
+                estCpuLoad.textContent = "Tinggi (> 40% CPU)";
+                estCpuLoad.style.color = "#f87171";
+            }
+        }
+
+        if (estCycleFit) {
+            const cycleSec = intervalMins * 60;
+            if (totalDurationSec <= cycleSec * 0.7) {
+                estCycleFit.textContent = "Leluasa (Selesai Cepat)";
+                estCycleFit.style.color = "#34d399";
+            } else if (totalDurationSec <= cycleSec) {
+                estCycleFit.textContent = "Pas (Tepat Waktu)";
+                estCycleFit.style.color = "#fbbf24";
+            } else {
+                estCycleFit.textContent = "⚠️ Melebihi Interval!";
+                estCycleFit.style.color = "#f87171";
+            }
+        }
+
+        const estKomdigiDesc = document.getElementById("estKomdigiDesc");
+
+        // Komdigi TrustPositif Real Traffic Calculation:
+        // Setiap domain melakukan 1 kueri REST API ke server trustpositif.komdigi.go.id
+        const requestsPerHour = Math.round((chunkSize * 60) / intervalMins);
+        const activeQps = Math.round((chunkSize / Math.max(1, totalDurationSec)) * 10) / 10;
+        const cooldownSec = Math.max(0, (intervalMins * 60) - totalDurationSec);
+
+        if (estKomdigiSafety) {
+            if ((intervalMins <= 1 && chunkSize >= 500) || requestsPerHour >= 30000 || cooldownSec < 10) {
+                estKomdigiSafety.textContent = "⚠️ Risiko Tinggi (WAF Komdigi)";
+                estKomdigiSafety.style.color = "#f87171";
+                if (estKomdigiDesc) {
+                    estKomdigiDesc.textContent = `~${requestsPerHour.toLocaleString()} req/jam (${activeQps} req/dtk). Berpotensi terkena rate-limit / ban IP jika 24/7.`;
+                    estKomdigiDesc.style.color = "#fca5a5";
+                }
+            } else if ((intervalMins <= 2 && chunkSize >= 500) || requestsPerHour >= 10000 || cooldownSec < 45) {
+                estKomdigiSafety.textContent = "🟡 Beban Sedang / Waspada";
+                estKomdigiSafety.style.color = "#fbbf24";
+                if (estKomdigiDesc) {
+                    estKomdigiDesc.textContent = `~${requestsPerHour.toLocaleString()} req/jam (${activeQps} req/dtk). Jeda istirahat singkat (${Math.round(cooldownSec)}s).`;
+                    estKomdigiDesc.style.color = "#fde68a";
+                }
+            } else {
+                estKomdigiSafety.textContent = "🟢 Aman & Wajar";
+                estKomdigiSafety.style.color = "#34d399";
+                if (estKomdigiDesc) {
+                    const cooldownMins = Math.round(cooldownSec / 60 * 10) / 10;
+                    estKomdigiDesc.textContent = `~${requestsPerHour.toLocaleString()} req/jam (${activeQps} req/dtk). Server Komdigi memiliki jeda istirahat ~${cooldownMins} mnt.`;
+                    estKomdigiDesc.style.color = "var(--text-muted)";
+                }
+            }
+        }
+    }
+
+    if (presetBtns.length > 0) {
+        presetBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                presetBtns.forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+
+                if (checkIntervalInput && btn.dataset.interval) checkIntervalInput.value = btn.dataset.interval;
+                if (chunkSizeInput && btn.dataset.chunk) chunkSizeInput.value = btn.dataset.chunk;
+                if (concurrentChecksInput && btn.dataset.concurrent) concurrentChecksInput.value = btn.dataset.concurrent;
+                if (chunkDelayInput && btn.dataset.delay) chunkDelayInput.value = btn.dataset.delay;
+
+                updatePerformanceEstimates();
+                showToast("Preset diterapkan: " + btn.textContent.trim(), "info");
+            });
+        });
+    }
+
+    [checkIntervalInput, chunkSizeInput, concurrentChecksInput, chunkDelayInput].forEach(input => {
+        if (input) {
+            input.addEventListener("input", updatePerformanceEstimates);
+        }
+    });
+
+    // Initial estimate calculation
+    updatePerformanceEstimates();
 
     // Settings Form Save
     const settingsForm = document.getElementById("settingsForm");
@@ -596,6 +1111,101 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (updateConsoleOutput) updateConsoleOutput.textContent += `\n[ERROR]: Kesalahan jaringan saat menghubungi server: ${err.message}`;
                 if (updateProgressSpinner) updateProgressSpinner.textContent = "Koneksi Terputus / Reloading";
                 showToast("Sistem sedang me-reload proses...", "info");
+            }
+        });
+    }
+
+    // ==========================================
+    // Keamanan Akun: Logout Semua Sesi & Reset 2FA
+    // ==========================================
+    const btnLogoutAllSessions = document.getElementById("btnLogoutAllSessions");
+    if (btnLogoutAllSessions) {
+        btnLogoutAllSessions.addEventListener("click", async () => {
+            if (!confirm("Apakah Anda yakin ingin mengakhiri dan me-logout seluruh sesi aktif akun ini di semua perangkat? Anda akan otomatis logout dari sesi saat ini.")) {
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/auth/logout-all", { method: "POST" });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || "Seluruh sesi telah diputus. Mengalihkan...", "success");
+                    setTimeout(() => window.location.href = "/login?logged_out=1", 1000);
+                } else {
+                    showToast(data.message || "Gagal memutus sesi.", "error");
+                }
+            } catch (err) {
+                showToast("Kesalahan jaringan saat memutus sesi.", "error");
+            }
+        });
+    }
+
+    const reset2faModal = document.getElementById("reset2faModal");
+    const btnOpenReset2faModal = document.getElementById("btnOpenReset2faModal");
+    const btnCloseReset2faModal = document.getElementById("btnCloseReset2faModal");
+    const btnCancelReset2fa = document.getElementById("btnCancelReset2fa");
+    const reset2faForm = document.getElementById("reset2faForm");
+    const resetCurrentPassword = document.getElementById("resetCurrentPassword");
+
+    if (btnOpenReset2faModal && reset2faModal) {
+        btnOpenReset2faModal.addEventListener("click", () => {
+            reset2faModal.style.display = "flex";
+            if (resetCurrentPassword) {
+                resetCurrentPassword.value = "";
+                resetCurrentPassword.focus();
+            }
+        });
+
+        const closeResetModal = () => { reset2faModal.style.display = "none"; };
+        if (btnCloseReset2faModal) btnCloseReset2faModal.addEventListener("click", closeResetModal);
+        if (btnCancelReset2fa) btnCancelReset2fa.addEventListener("click", closeResetModal);
+        reset2faModal.addEventListener("click", (e) => {
+            if (e.target === reset2faModal) closeResetModal();
+        });
+    }
+
+    if (reset2faForm) {
+        reset2faForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const password = resetCurrentPassword ? resetCurrentPassword.value : "";
+            if (!password) {
+                showToast("Masukkan password akun Anda untuk konfirmasi!", "warning");
+                return;
+            }
+
+            const btnConfirm = document.getElementById("btnConfirmReset2fa");
+            const originalText = btnConfirm ? btnConfirm.innerHTML : "";
+            if (btnConfirm) {
+                btnConfirm.disabled = true;
+                btnConfirm.innerHTML = `<span class="spinner"></span> Mereset...`;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append("current_password", password);
+
+                const res = await fetch("/api/auth/reset-2fa", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast(data.message || "2FA berhasil direset. Mengalihkan ke login...", "success");
+                    setTimeout(() => window.location.href = "/login", 1200);
+                } else {
+                    showToast(data.message || "Gagal mereset 2FA. Password salah.", "error");
+                    if (btnConfirm) {
+                        btnConfirm.disabled = false;
+                        btnConfirm.innerHTML = originalText;
+                    }
+                }
+            } catch (err) {
+                showToast("Kesalahan jaringan saat mereset 2FA.", "error");
+                if (btnConfirm) {
+                    btnConfirm.disabled = false;
+                    btnConfirm.innerHTML = originalText;
+                }
             }
         });
     }

@@ -369,6 +369,87 @@ body {
 }
 
 /* ==========================================================================
+   KPI Summary Grid & Stat Cards (Customers / Analytics)
+   ========================================================================== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stat-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.15rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.stat-card:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.stat-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+
+.stat-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    font-weight: 500;
+}
+
+.actions-btn-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.compact-table td.actions-cell {
+    overflow: visible;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
    Monospace Bulk Input Console (Batch Editor)
    ========================================================================== */
 .console-panel {
@@ -548,6 +629,63 @@ body {
     border-color: var(--border-focus);
 }
 
+.controls-right-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-category-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.filter-select {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    font-size: 0.78rem;
+    padding: 0.38rem 0.65rem;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s ease;
+}
+
+.filter-select:focus {
+    border-color: var(--border-focus);
+}
+
+.clickable-category-edit {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.clickable-category-edit:hover {
+    background: rgba(99, 102, 241, 0.18);
+    border-color: rgba(99, 102, 241, 0.45);
+    color: #a5b4fc;
+}
+
+.category-edit-icon {
+    width: 10px;
+    height: 10px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    margin-left: 4px;
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+}
+
+.clickable-category-edit:hover .category-edit-icon {
+    opacity: 1;
+}
+
 /* ==========================================================================
    High-Density Compact Data Table
    ========================================================================== */
@@ -566,6 +704,8 @@ body {
 
 .compact-table {
     width: 100%;
+    min-width: 960px;
+    table-layout: fixed;
     border-collapse: collapse;
     text-align: left;
     font-size: 0.8rem;
@@ -573,22 +713,25 @@ body {
 }
 
 .compact-table th {
-    padding: 0.5rem 0.75rem;
+    padding: 0.42rem 0.5rem;
     color: var(--text-dim);
-    font-size: 0.68rem;
+    font-size: 0.67rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     background: var(--bg-elevated);
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .compact-table td {
-    padding: 0.5rem 0.75rem;
+    padding: 0.42rem 0.5rem;
     border-bottom: 1px solid var(--border-subtle);
     color: var(--text-main);
     vertical-align: middle;
+    overflow: hidden;
 }
 
 .compact-table tbody tr {
@@ -603,17 +746,85 @@ body {
     border-bottom: none;
 }
 
+.cell-number {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+    user-select: none;
+}
+
 .cell-domain {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     font-weight: 500;
     color: #ffffff;
     letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cell-domain.clickable-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    transition: background 0.15s ease, color 0.15s ease;
+    max-width: 100%;
+}
+
+.cell-domain.clickable-copy:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #60a5fa;
+}
+
+.cell-domain.clickable-copy .copy-icon {
+    width: 12px;
+    height: 12px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+}
+
+.cell-domain.clickable-copy:hover .copy-icon {
+    opacity: 0.8;
+}
+
+.cell-domain.clickable-copy.copied {
+    color: #34d399 !important;
+    background: rgba(52, 211, 153, 0.1) !important;
+}
+
+.cell-domain.clickable-copy.copied .copy-icon {
+    opacity: 1;
 }
 
 .cell-meta {
     font-size: 0.72rem;
     color: var(--text-dim);
+}
+
+.badge-category {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #818cf8;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ==========================================================================
@@ -689,17 +900,27 @@ body {
     border: 1px solid #541926;
 }
 
-/* ISP Cell (Muted pill + Latency ms) */
-.isp-cell {
+/* ISP Compact Badge (Centered & Tooltip on Hover) */
+.isp-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    font-weight: 500;
+    line-height: 1.35;
+    min-width: 54px;
+    text-align: center;
+    cursor: help;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
-.isp-latency {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--text-dim);
+.isp-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .badge-operator {
@@ -902,6 +1123,41 @@ body {
     gap: 1rem;
 }
 
+/* Preset Buttons for Scheduler */
+.preset-btn-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.preset-btn {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 0.28rem 0.65rem;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.preset-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-main);
+    border-color: var(--border-focus);
+}
+
+.preset-btn.active {
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent-sky);
+    border-color: var(--accent-sky);
+}
+
 .switch-wrapper {
     display: flex;
     align-items: center;
@@ -948,6 +1204,96 @@ body {
 .switch-wrapper input:checked + .switch-slider::before {
     transform: translateX(16px);
     background-color: #ffffff;
+}
+
+/* ==========================================================================
+   Modal Overlay & Category Selection Radio Styles
+   ========================================================================== */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 10000;
+}
+
+.modal-dialog {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    width: 100%;
+    max-width: 500px;
+    padding: 1.25rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    animation: modalIn 0.15s ease-out;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.96) translateY(-8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--text-main);
+}
+
+.category-radio-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.category-radio-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-focus);
+}
+
+.category-radio-item input[type="radio"] {
+    margin-top: 0.2rem;
+    accent-color: var(--accent-indigo);
+    cursor: pointer;
+}
+
+.category-radio-item.selected {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+.category-radio-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.category-radio-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.category-radio-desc {
+    font-size: 0.72rem;
+    color: var(--text-dim);
 }
 
 /* ==========================================================================

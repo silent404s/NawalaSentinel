@@ -77,42 +77,26 @@
             00m 00s
         </div>
     </div>
-</div>
-
-<!-- Compact Monospace Batch Input Console -->
-<div class="console-panel">
-    <div class="console-header">
-        <div class="console-title">
-            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-            Input Batch / Paste Ribuan Domain
+</div><!-- Customer Domain Management Info Banner -->
+<div class="customer-info-banner" style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: var(--radius-md); padding: 0.85rem 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 0.85rem;">
+        <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(56, 189, 248, 0.12); color: var(--accent-sky); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg class="svg-icon" viewBox="0 0 24 24" style="width: 20px; height: 20px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         </div>
-        <div class="console-counter" id="domainCounter">0 domain terdeteksi</div>
+        <div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">Sistem Pemantauan Khusus Pelanggan (Customer Only)</div>
+            <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">Seluruh domain didaftarkan & dikelola secara mandiri oleh masing-masing grup via bot Telegram (<code>/add</code>, <code>/del</code>, <code>/replace</code>). Admin tidak menambahkan domain terpisah.</div>
+        </div>
     </div>
-    <div class="console-body">
-        <form id="addTextForm">
-            <textarea id="rawDomainsTextarea" name="raw_domains" class="console-textarea" placeholder="Paste ribuan link atau domain di sini (1 per baris)...&#10;example.com&#10;sub.domain.co.id&#10;https://target-portal.com" required></textarea>
-            <input type="hidden" name="category" value="General">
-            
-            <div class="console-toolbar">
-                <div class="console-file-drop">
-                    <label class="console-file-label" for="fileInputDirect">
-                        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
-                        Upload CSV / TXT
-                    </label>
-                    <input type="file" id="fileInputDirect" accept=".txt,.csv" style="display: none;">
-                    <span id="fileSelectedName" style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);"></span>
-                </div>
-
-                <button type="submit" class="btn btn-primary">
-                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    Simpan & Proses Domain
-                </button>
-            </div>
-        </form>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <a href="/customers" class="btn btn-secondary btn-xs" style="gap: 0.4rem; padding: 0.35rem 0.75rem; height: auto;">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            Kelola Pelanggan & Whitelist
+        </a>
     </div>
 </div>
 
-<!-- Controls Bar (Segmented Filter & Instant Search) -->
+<!-- Controls Bar (Segmented Filter, Category Filter, Rename Category, Instant Search) -->
 <div class="controls-bar">
     <div class="segmented-filter">
         <button type="button" class="segmented-btn active" data-filter="ALL">
@@ -135,9 +119,27 @@
         </button>
     </div>
 
-    <div class="filter-search-box">
-        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="tableInstantSearch" class="filter-search-input" placeholder="Filter domain seketika...">
+    <div class="controls-right-group">
+        <!-- Category Filter Dropdown -->
+        <div class="filter-category-box">
+            <select id="categoryFilterSelect" class="filter-select" title="Filter berdasarkan kategori">
+                <option value="ALL">Semua Kategori ({{ stats.total }})</option>
+                {% for cat in categories %}
+                <option value="{{ cat.name }}">{{ cat.name }} ({{ cat.count }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Button Edit / Rename Category -->
+        <button type="button" id="btnOpenRenameCategoryModal" class="btn btn-secondary btn-sm" title="Ubah nama kategori yang sudah ada">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            Ubah Kategori
+        </button>
+
+        <div class="filter-search-box">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="tableInstantSearch" class="filter-search-input" placeholder="Filter domain seketika...">
+        </div>
     </div>
 </div>
 
@@ -147,25 +149,44 @@
         <table class="compact-table" id="domainsDataTable">
             <thead>
                 <tr>
-                    <th>Domain / Subdomain</th>
-                    <th>Status Nawala</th>
-                    <th>STATUS CF</th>
-                    <th>Telkomsel</th>
-                    <th>XL Axiata</th>
-                    <th>IM3 Indosat</th>
-                    <th>Tri (3)</th>
-                    <th>Terakhir Dicek</th>
-                    <th style="text-align: right;">Aksi</th>
+                    <th style="width: 3.5%; text-align: center;">No.</th>
+                    <th style="width: 22%;">Domain / Subdomain</th>
+                    <th style="width: 14%;">Kategori</th>
+                    <th style="width: 9%; text-align: center;">Nawala</th>
+                    <th style="width: 9%; text-align: center;">Cloudflare</th>
+                    <th style="width: 7.5%; text-align: center;" title="Telkomsel">Telkomsel</th>
+                    <th style="width: 7%; text-align: center;" title="XL Axiata">XL</th>
+                    <th style="width: 7%; text-align: center;" title="IM3 Indosat">IM3</th>
+                    <th style="width: 7%; text-align: center;" title="Tri (3)">Tri</th>
+                    <th style="width: 9%; text-align: center;">Terakhir Dicek</th>
+                    <th style="width: 5%; text-align: right;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 {% for domain in domains %}
                 {% set op_dict = op_results_map.get(domain.id, {}) %}
-                <tr class="table-row-item" data-status="{{ domain.overall_status }}" data-cf="{{ domain.cf_status }}" data-domain="{{ domain.name|lower }}">
+                <tr class="table-row-item" data-status="{{ domain.overall_status }}" data-cf="{{ domain.cf_status }}" data-domain="{{ domain.name|lower }}" data-category="{{ (domain.category or 'General')|lower }}">
+                    <td class="cell-number">{{ loop.index }}</td>
                     <td>
-                        <span class="cell-domain">{{ domain.name }}</span>
+                        <span class="cell-domain clickable-copy" data-copy="{{ domain.name }}" title="Klik untuk menyalin link">
+                            {{ domain.name }}
+                            <svg class="copy-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </span>
                     </td>
                     <td>
+                        {% if domain.tenant_id %}
+                        <span class="badge-category tenant-managed" title="🔒 Domain milik grup tenant ({{ domain.tenant.name if domain.tenant else 'Grup Pelanggan' }}). Dikelola secara mandiri oleh pengguna di grup chat." style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.76rem; font-weight: 600;">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            <span>{{ domain.category or 'Bot Input' }}</span>
+                        </span>
+                        {% else %}
+                        <span class="badge-category clickable-category-edit" data-id="{{ domain.id }}" data-name="{{ domain.name }}" data-category="{{ domain.category or 'General' }}" title="Klik untuk mengubah kategori domain ini">
+                            <span class="badge-category-text">{{ domain.category or 'General' }}</span>
+                            <svg class="category-edit-icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
                         <span class="badge-status {{ domain.overall_status }}">
                             <span class="badge-dot"></span>
                             {{ domain.overall_status }}
@@ -173,7 +194,7 @@
                     </td>
 
                     <!-- STATUS CF -->
-                    <td>
+                    <td style="text-align: center;">
                         {% if domain.cf_status == 'PHISHING' %}
                             <span class="badge-status PHISHING" title="{{ domain.cf_reason or 'Cloudflare Suspected Phishing' }}">
                                 <span class="badge-dot"></span>
@@ -185,99 +206,254 @@
                                 NORMAL
                             </span>
                         {% else %}
-                            <span class="badge-status UNCHECKED">
-                                <span class="badge-dot"></span>
+                            <span class="badge-status UNCHECKED" title="Belum dicek">
                                 -
                             </span>
                         {% endif %}
                     </td>
 
                     <!-- Telkomsel -->
-                    <td>
+                    <td style="text-align: center;">
                         {% set tsel = op_dict.get('Telkomsel') %}
                         {% if tsel %}
-                            <div class="isp-cell">
-                                <span class="badge-status {{ tsel.status }}" title="{{ tsel.block_reason }}">
-                                    <span class="badge-dot"></span>
-                                    {{ tsel.status }}
-                                </span>
-                                <span class="isp-latency">{{ tsel.latency_ms }}ms</span>
-                            </div>
+                            <span class="badge-status {{ tsel.status }} isp-badge" title="Telkomsel: {{ tsel.status }} ({{ tsel.latency_ms }}ms){% if tsel.block_reason %} - {{ tsel.block_reason }}{% endif %}">
+                                <span class="badge-dot"></span>
+                                {{ tsel.status }}
+                            </span>
                         {% else %}
-                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                            <span class="badge-status UNCHECKED isp-badge" title="Belum dicek">-</span>
                         {% endif %}
                     </td>
 
                     <!-- XL -->
-                    <td>
+                    <td style="text-align: center;">
                         {% set xl = op_dict.get('XL') %}
                         {% if xl %}
-                            <div class="isp-cell">
-                                <span class="badge-status {{ xl.status }}" title="{{ xl.block_reason }}">
-                                    <span class="badge-dot"></span>
-                                    {{ xl.status }}
-                                </span>
-                                <span class="isp-latency">{{ xl.latency_ms }}ms</span>
-                            </div>
+                            <span class="badge-status {{ xl.status }} isp-badge" title="XL: {{ xl.status }} ({{ xl.latency_ms }}ms){% if xl.block_reason %} - {{ xl.block_reason }}{% endif %}">
+                                <span class="badge-dot"></span>
+                                {{ xl.status }}
+                            </span>
                         {% else %}
-                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                            <span class="badge-status UNCHECKED isp-badge" title="Belum dicek">-</span>
                         {% endif %}
                     </td>
 
                     <!-- IM3 -->
-                    <td>
+                    <td style="text-align: center;">
                         {% set im3 = op_dict.get('IM3') %}
                         {% if im3 %}
-                            <div class="isp-cell">
-                                <span class="badge-status {{ im3.status }}" title="{{ im3.block_reason }}">
-                                    <span class="badge-dot"></span>
-                                    {{ im3.status }}
-                                </span>
-                                <span class="isp-latency">{{ im3.latency_ms }}ms</span>
-                            </div>
+                            <span class="badge-status {{ im3.status }} isp-badge" title="IM3: {{ im3.status }} ({{ im3.latency_ms }}ms){% if im3.block_reason %} - {{ im3.block_reason }}{% endif %}">
+                                <span class="badge-dot"></span>
+                                {{ im3.status }}
+                            </span>
                         {% else %}
-                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                            <span class="badge-status UNCHECKED isp-badge" title="Belum dicek">-</span>
                         {% endif %}
                     </td>
 
                     <!-- Tri -->
-                    <td>
+                    <td style="text-align: center;">
                         {% set tri = op_dict.get('Tri') %}
                         {% if tri %}
-                            <div class="isp-cell">
-                                <span class="badge-status {{ tri.status }}" title="{{ tri.block_reason }}">
-                                    <span class="badge-dot"></span>
-                                    {{ tri.status }}
-                                </span>
-                                <span class="isp-latency">{{ tri.latency_ms }}ms</span>
-                            </div>
+                            <span class="badge-status {{ tri.status }} isp-badge" title="Tri: {{ tri.status }} ({{ tri.latency_ms }}ms){% if tri.block_reason %} - {{ tri.block_reason }}{% endif %}">
+                                <span class="badge-dot"></span>
+                                {{ tri.status }}
+                            </span>
                         {% else %}
-                            <span class="badge-status UNCHECKED"><span class="badge-dot"></span>-</span>
+                            <span class="badge-status UNCHECKED isp-badge" title="Belum dicek">-</span>
                         {% endif %}
                     </td>
 
-                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
-                        {% if domain.last_checked_at %}{{ domain.last_checked_at|wib_datetime }}{% else %}Belum dicek{% endif %}
+                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; text-align: center;" title="{% if domain.last_checked_at %}{{ domain.last_checked_at|wib_datetime }}{% endif %}">
+                        {% if domain.last_checked_at %}{{ domain.last_checked_at|wib_datetime("%d %b %H:%M") }}{% else %}Belum dicek{% endif %}
                     </td>
 
                     <td style="text-align: right; white-space: nowrap;">
                         <button type="button" class="btn btn-secondary btn-xs btn-recheck-domain" data-id="{{ domain.id }}" title="Cek Ulang">
                             <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                         </button>
+                        {% if domain.tenant_id %}
+                        <button type="button" class="btn btn-secondary btn-xs" disabled style="opacity: 0.35; cursor: not-allowed; border-color: rgba(255,255,255,0.08);" title="🔒 Domain milik grup tenant ({{ domain.tenant.name if domain.tenant else 'Grup' }}). Hanya dapat dihapus/diedit oleh anggota grup melalui bot (/del atau /replace).">
+                            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </button>
+                        {% else %}
                         <button type="button" class="btn btn-danger btn-xs btn-delete-domain" data-id="{{ domain.id }}" data-name="{{ domain.name }}" title="Hapus">
                             <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
+                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr id="emptyTableRow">
-                    <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
-                        Tidak ada domain terdaftar. Masukkan ribuan link pada input console di atas.
+                    <td colspan="11" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                        Tidak ada domain terdaftar. Domain akan otomatis tampil di sini saat grup pelanggan menambahkan domain via bot Telegram (<code>/add</code>).
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Modal Pop-up: Pilih Kategori Domain -->
+<div id="categoryModal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog" style="max-width: 490px;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; color: #ffffff;">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-indigo);">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+                Pilih Kategori Domain
+            </h3>
+            <button type="button" class="modal-close" id="btnCloseCategoryModal" style="font-size: 1.4rem; color: var(--text-dim); background: transparent; border: none; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="margin-bottom: 1.25rem;">
+            <p style="font-size: 0.83rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
+                Sebanyak <strong id="modalDomainCount" style="color: var(--accent-sky); font-family: var(--font-mono); font-size: 0.95rem;">0</strong> domain akan diproses. Domain tersebut ingin dimasukkan ke kategori apa?
+            </p>
+
+            <div class="category-radio-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label class="category-radio-item selected">
+                    <input type="radio" name="modal_category_choice" value="General" checked>
+                    <div class="category-radio-content">
+                        <span class="category-radio-title">General (Umum)</span>
+                        <span class="category-radio-desc">Kategori bawaan untuk domain umum</span>
+                    </div>
+                </label>
+
+                <label class="category-radio-item">
+                    <input type="radio" name="modal_category_choice" value="Utama">
+                    <div class="category-radio-content">
+                        <span class="category-radio-title">Utama / Landing Page</span>
+                        <span class="category-radio-desc">Domain landing page aktif & beromset</span>
+                    </div>
+                </label>
+
+                <label class="category-radio-item">
+                    <input type="radio" name="modal_category_choice" value="Redirector">
+                    <div class="category-radio-content">
+                        <span class="category-radio-title">Redirector / PBN</span>
+                        <span class="category-radio-desc">Domain perantara pengalihan trafik SEO</span>
+                    </div>
+                </label>
+
+                <label class="category-radio-item">
+                    <input type="radio" name="modal_category_choice" value="Cadangan">
+                    <div class="category-radio-content">
+                        <span class="category-radio-title">Cadangan / Standby</span>
+                        <span class="category-radio-desc">Domain cadangan siap pakai jika domain utama terblokir</span>
+                    </div>
+                </label>
+
+                <label class="category-radio-item">
+                    <input type="radio" name="modal_category_choice" value="__custom__">
+                    <div class="category-radio-content">
+                        <span class="category-radio-title" style="color: var(--accent-sky);">+ Buat Kategori Baru</span>
+                        <span class="category-radio-desc">Ketik nama kategori kustom Anda sendiri</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Custom Category Input in Modal -->
+            <div id="modalCustomCategoryWrapper" style="display: none; margin-top: 0.75rem; background: rgba(11,15,25,0.7); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem; display: block;">Ketik Nama Kategori Baru:</label>
+                <input type="text" id="modalCustomCategoryInput" placeholder="Contoh: Affiliate-Tier1, Google-Ads..." class="form-control" style="font-size: 0.84rem; font-family: var(--font-mono);">
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.65rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" id="btnCancelCategoryModal">Batal</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmCategoryModal">
+                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Konfirmasi & Simpan
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Ubah Kategori Domain Tertentu (Single Domain) -->
+<div id="editSingleCategoryModal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog" style="max-width: 460px;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; color: #ffffff;">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-indigo);"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Ubah Kategori Domain
+            </h3>
+            <button type="button" class="modal-close" id="btnCloseEditSingleModal" style="font-size: 1.4rem; color: var(--text-dim); background: transparent; border: none; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="margin-bottom: 1.25rem;">
+            <p style="font-size: 0.83rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
+                Domain: <strong id="editSingleDomainName" style="color: #ffffff; font-family: var(--font-mono);">example.com</strong>
+            </p>
+            <input type="hidden" id="editSingleDomainId" value="">
+
+            <div style="margin-bottom: 0.85rem;">
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem; display: block;">Pilih Kategori:</label>
+                <select id="editSingleCategorySelect" class="form-control" style="font-size: 0.84rem;">
+                    <option value="General">General (Umum)</option>
+                    <option value="Utama">Utama / Landing Page</option>
+                    <option value="Redirector">Redirector / PBN</option>
+                    <option value="Cadangan">Cadangan / Standby</option>
+                    {% for cat in categories %}
+                    {% if cat.name not in ['General', 'Utama', 'Redirector', 'Cadangan'] %}
+                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                    <option value="__custom__">+ Buat Kategori Baru...</option>
+                </select>
+            </div>
+
+            <div id="editSingleCustomWrapper" style="display: none; margin-top: 0.75rem; background: rgba(11,15,25,0.7); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem; display: block;">Nama Kategori Baru:</label>
+                <input type="text" id="editSingleCustomInput" placeholder="Contoh: Affiliate-Tier1..." class="form-control" style="font-size: 0.84rem; font-family: var(--font-mono);">
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.65rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" id="btnCancelEditSingleModal">Batal</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmEditSingleModal">
+                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Simpan Kategori
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Ubah / Rename Nama Kategori Secara Global -->
+<div id="renameCategoryModal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog" style="max-width: 460px;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; color: #ffffff;">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-indigo);"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Ubah / Ganti Nama Kategori
+            </h3>
+            <button type="button" class="modal-close" id="btnCloseRenameCategoryModal" style="font-size: 1.4rem; color: var(--text-dim); background: transparent; border: none; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="margin-bottom: 1.25rem;">
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
+                Mengubah nama kategori akan otomatis memperbarui seluruh domain yang berada di dalam kategori tersebut.
+            </p>
+
+            <div style="margin-bottom: 0.85rem;">
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem; display: block;">Pilih Kategori yang Ingin Diubah:</label>
+                <select id="renameOldCategorySelect" class="form-control" style="font-size: 0.84rem;">
+                    {% for cat in categories %}
+                    <option value="{{ cat.name }}">{{ cat.name }} ({{ cat.count }} domain)</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 0.85rem;">
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem; display: block;">Nama Kategori Baru:</label>
+                <input type="text" id="renameNewCategoryInput" placeholder="Masukkan nama kategori baru..." class="form-control" style="font-size: 0.84rem; font-family: var(--font-mono);">
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.65rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" id="btnCancelRenameCategoryModal">Batal</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmRenameCategoryModal">
+                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Terapkan Perubahan
+            </button>
+        </div>
     </div>
 </div>
 {% endblock %}

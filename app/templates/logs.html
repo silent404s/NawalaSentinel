@@ -1,65 +1,424 @@
 {% extends "base.html" %}
 
-{% block title %}Riwayat Status — NawalaSentinel{% endblock %}
+{% block title %}Riwayat & Audit Log — NawalaSentinel{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<!-- Page Header -->
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
     <div>
-        <h1 class="page-title">Riwayat Perubahan Status</h1>
-        <p class="page-subtitle">Log audit pergeseran status pemblokiran domain (Normal &harr; Terblokir)</p>
+        <h1 class="page-title">Riwayat & Audit Log Sistem</h1>
+        <p class="page-subtitle">Audit trail lengkap aktivitas pengguna bot Telegram (/add, /del, /replace) & riwayat status operator ISP</p>
     </div>
 </div>
 
-<div class="table-panel">
-    <div class="table-responsive">
-        <table class="compact-table">
-            <thead>
-                <tr>
-                    <th>Waktu (WIB)</th>
-                    <th>Nama Domain</th>
-                    <th>Operator Seluler</th>
-                    <th>Status Lama</th>
-                    <th>Status Baru</th>
-                    <th>Alasan / Keterangan</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for log in logs %}
-                <tr>
-                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
-                        {{ log.timestamp|wib_datetime }}
-                    </td>
-                    <td>
-                        <span class="cell-domain">{{ log.domain_name }}</span>
-                    </td>
-                    <td>
-                        <span class="badge-operator">{{ log.operator }}</span>
-                    </td>
-                    <td>
-                        <span class="badge-status {{ log.previous_status }}">
-                            <span class="badge-dot"></span>
-                            {{ log.previous_status }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="badge-status {{ log.new_status }}">
-                            <span class="badge-dot"></span>
-                            {{ log.new_status }}
-                        </span>
-                    </td>
-                    <td style="font-size: 0.78rem; color: var(--text-muted);">
-                        {{ log.reason }}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
-                        Belum ada catatan perubahan status tercatat.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- KPI Summary Cards -->
+<div class="stats-grid" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(56, 189, 248, 0.1); color: var(--accent-sky);">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statTotalBotLogs">{{ total_bot_logs }}</div>
+            <div class="stat-label">Total Aktivitas Bot</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: var(--accent-emerald);">
+            <svg class="svg-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statCountAdd" style="color: var(--accent-emerald);">{{ count_add }}</div>
+            <div class="stat-label">Perintah Tambah (/add)</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-rose);">
+            <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statCountDel" style="color: var(--accent-rose);">{{ count_del }}</div>
+            <div class="stat-label">Perintah Hapus (/del)</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+            <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statCountReplace" style="color: #f59e0b;">{{ count_replace }}</div>
+            <div class="stat-label">Perintah Ganti (/replace)</div>
+        </div>
     </div>
 </div>
+
+<!-- Tab Navigation Header -->
+<div class="log-tabs-nav" style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+    <button type="button" class="tab-btn active" id="tabBtnBotLogs" onclick="switchLogTab('bot')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.15rem; background: none; border: none; border-bottom: 2px solid var(--accent-sky); color: #ffffff; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="color: var(--accent-sky);"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path><rect x="4" y="8" width="16" height="12" rx="2"></rect><circle cx="9" cy="13" r="1"></circle><circle cx="15" cy="13" r="1"></circle><line x1="9" y1="17" x2="15" y2="17"></line></svg>
+        Log Aktivitas Bot Telegram
+        <span class="badge-count" style="font-family: var(--font-mono); font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: var(--accent-sky); padding: 0.1rem 0.45rem; border-radius: 9999px; border: 1px solid rgba(56, 189, 248, 0.3);">{{ bot_logs|length }}</span>
+    </button>
+    <button type="button" class="tab-btn" id="tabBtnStatusLogs" onclick="switchLogTab('status')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.15rem; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        Riwayat Status Operator ISP
+        <span class="badge-count" style="font-family: var(--font-mono); font-size: 0.72rem; background: rgba(255, 255, 255, 0.06); color: var(--text-muted); padding: 0.1rem 0.45rem; border-radius: 9999px; border: 1px solid var(--border-color);">{{ logs|length }}</span>
+    </button>
+</div>
+
+<!-- ========================================================================= -->
+<!-- TAB 1: LOG AKTIVITAS BOT TELEGRAM (AUDIT TRAIL) -->
+<!-- ========================================================================= -->
+<div id="tabContentBot" class="tab-content-panel">
+    <!-- Controls Bar -->
+    <div class="table-controls-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <!-- Filter Command -->
+            <select id="filterBotCommand" class="form-control" onchange="filterBotLogs()" style="height: 32px; font-size: 0.78rem; padding: 0 0.65rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px;">
+                <option value="">Semua Perintah</option>
+                <option value="/add">/add (Tambah Domain)</option>
+                <option value="/del">/del (Hapus Domain)</option>
+                <option value="/replace">/replace (Ganti Domain)</option>
+                <option value="/cek">/cek (Cek Status)</option>
+                <option value="/list">/list (Lihat Daftar)</option>
+                <option value="/status">/status (Status Grup)</option>
+                <option value="/help">/help (Panduan)</option>
+                <option value="/info">/info (Info Langganan)</option>
+                <option value="/katakatahariini">/katakatahariini (Quotes)</option>
+            </select>
+
+            <!-- Filter Status -->
+            <select id="filterBotStatus" class="form-control" onchange="filterBotLogs()" style="height: 32px; font-size: 0.78rem; padding: 0 0.65rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px;">
+                <option value="">Semua Status</option>
+                <option value="SUCCESS">SUCCESS (Berhasil)</option>
+                <option value="FAILED">FAILED (Gagal)</option>
+                <option value="REJECTED">REJECTED (Ditolak)</option>
+            </select>
+
+            <span class="badge-count" style="font-family: var(--font-mono); font-size: 0.72rem; background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid var(--border-color); color: var(--accent-sky);" id="botLogCountBadge">{{ bot_logs|length }} log</span>
+        </div>
+
+        <!-- Search Input -->
+        <div class="filter-search-box" style="position: relative; min-width: 320px;">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; width: 14px; height: 14px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="botInstantSearch" oninput="filterBotLogs()" class="form-control filter-search-input" placeholder="Cari username, user ID, perintah, aksi..." style="padding-left: 2.2rem; font-size: 0.82rem; height: 32px; width: 100%;">
+        </div>
+    </div>
+
+    <!-- Table Panel -->
+    <div class="table-panel">
+        <div class="table-responsive">
+            <table class="compact-table" style="min-width: 1100px; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="width: 14%;">Waktu (WIB)</th>
+                        <th style="width: 18%;">Pengguna Telegram</th>
+                        <th style="width: 16%;">Grup / Whitelist</th>
+                        <th style="width: 11%;">Perintah</th>
+                        <th style="width: 31%;">Rincian Aksi</th>
+                        <th style="width: 10%; text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="botLogTableBody">
+                    {% for log in bot_logs %}
+                    <tr class="bot-log-row" 
+                        data-command="{{ log.command }}" 
+                        data-status="{{ log.status }}" 
+                        data-search="{{ (log.telegram_username or '') ~ ' ' ~ (log.telegram_user_id or '') ~ ' ' ~ (log.full_name or '') ~ ' ' ~ log.command ~ ' ' ~ log.details ~ ' ' ~ (log.tenant.name if log.tenant else '') ~ ' ' ~ (log.telegram_chat_id or '')|lower }}">
+                        
+                        <!-- Waktu WIB -->
+                        <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
+                            {{ log.created_at|wib_datetime }}
+                        </td>
+
+                        <!-- Pengguna Telegram -->
+                        <td>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                {% if log.telegram_username %}
+                                <div style="font-weight: 700; color: #38bdf8; font-family: var(--font-mono); font-size: 0.82rem;">
+                                    @{{ log.telegram_username }}
+                                </div>
+                                {% else %}
+                                <div style="color: var(--text-dim); font-size: 0.78rem; font-style: italic;">
+                                    (Tanpa Username)
+                                </div>
+                                {% endif %}
+                                <div style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted);">
+                                    UID: {{ log.telegram_user_id or '-' }}
+                                </div>
+                                {% if log.full_name %}
+                                <div style="font-size: 0.72rem; color: var(--text-dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ log.full_name }}">
+                                    👤 {{ log.full_name }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Grup Telegram -->
+                        <td>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <div style="font-weight: 600; color: #ffffff; font-size: 0.82rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ log.tenant.name if log.tenant else '-' }}">
+                                    {{ log.tenant.name if log.tenant else '(Non-Whitelist)' }}
+                                </div>
+                                <div style="font-family: var(--font-mono); font-size: 0.70rem; color: var(--text-dim);">
+                                    Chat: {{ log.telegram_chat_id }}
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Perintah -->
+                        <td>
+                            {% if log.command == '/add' %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 5px; color: #4ade80; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;">
+                                /add
+                            </span>
+                            {% elif log.command == '/del' %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 5px; color: #f87171; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;">
+                                /del
+                            </span>
+                            {% elif log.command == '/replace' %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 5px; color: #fbbf24; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;">
+                                /replace
+                            </span>
+                            {% elif log.command == '/cek' %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 5px; color: #38bdf8; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;">
+                                /cek
+                            </span>
+                            {% elif log.command == '/list' %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 5px; color: #818cf8; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;">
+                                /list
+                            </span>
+                            {% elif log.command == '/status' %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 5px; color: #c084fc; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;">
+                                /status
+                            </span>
+                            {% else %}
+                            <span style="display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 5px; color: #e4e4e7; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;">
+                                {{ log.command }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Rincian Aksi -->
+                        <td style="font-size: 0.80rem; line-height: 1.45; word-break: break-word;">
+                            <div style="color: #f4f4f5;">{{ log.details }}</div>
+                            {% if log.raw_message and log.raw_message != log.command %}
+                            <div style="font-family: var(--font-mono); font-size: 0.70rem; color: var(--text-dim); margin-top: 3px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; display: inline-block;">
+                                <code>{{ log.raw_message }}</code>
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status -->
+                        <td style="text-align: center;">
+                            {% if log.status == 'SUCCESS' %}
+                            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 0.18rem 0.5rem; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 9999px; color: #4ade80; font-size: 0.70rem; font-weight: 700; font-family: var(--font-mono);">
+                                <span style="width: 5px; height: 5px; background: #4ade80; border-radius: 50%;"></span>
+                                SUCCESS
+                            </span>
+                            {% elif log.status == 'FAILED' %}
+                            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 0.18rem 0.5rem; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 9999px; color: #f87171; font-size: 0.70rem; font-weight: 700; font-family: var(--font-mono);">
+                                <span style="width: 5px; height: 5px; background: #f87171; border-radius: 50%;"></span>
+                                FAILED
+                            </span>
+                            {% else %}
+                            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 0.18rem 0.5rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; color: #fbbf24; font-size: 0.70rem; font-weight: 700; font-family: var(--font-mono);">
+                                <span style="width: 5px; height: 5px; background: #fbbf24; border-radius: 50%;"></span>
+                                {{ log.status }}
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="emptyBotLogRow">
+                        <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 3rem 1rem; font-family: var(--font-mono);">
+                            Belum ada catatan aktivitas bot Telegram yang terekam.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="noFilterMatchRow" style="display: none;">
+                        <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                            Tidak ada log aktivitas yang cocok dengan kriteria pencarian/filter.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- TAB 2: RIWAYAT PERUBAHAN STATUS OPERATOR ISP -->
+<!-- ========================================================================= -->
+<div id="tabContentStatus" class="tab-content-panel" style="display: none;">
+    <!-- Controls Bar -->
+    <div class="table-controls-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Riwayat Perubahan Status Operator ISP (Telkomsel, XL, IM3, Tri)</span>
+            <span class="badge-count" style="font-family: var(--font-mono); font-size: 0.72rem; background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid var(--border-color); color: var(--accent-sky);" id="statusLogCountBadge">{{ logs|length }} log</span>
+        </div>
+
+        <!-- Search Input -->
+        <div class="filter-search-box" style="position: relative; min-width: 280px;">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; width: 14px; height: 14px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="statusInstantSearch" oninput="filterStatusLogs()" class="form-control filter-search-input" placeholder="Cari domain, operator, atau status..." style="padding-left: 2.2rem; font-size: 0.82rem; height: 32px; width: 100%;">
+        </div>
+    </div>
+
+    <!-- Table Panel -->
+    <div class="table-panel">
+        <div class="table-responsive">
+            <table class="compact-table" style="min-width: 900px; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="width: 16%;">Waktu (WIB)</th>
+                        <th style="width: 24%;">Nama Domain</th>
+                        <th style="width: 14%;">Operator Seluler</th>
+                        <th style="width: 12%;">Status Lama</th>
+                        <th style="width: 12%;">Status Baru</th>
+                        <th style="width: 22%;">Alasan / Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody id="statusLogTableBody">
+                    {% for log in logs %}
+                    <tr class="status-log-row" data-search="{{ (log.domain_name ~ ' ' ~ log.operator ~ ' ' ~ log.previous_status ~ ' ' ~ log.new_status ~ ' ' ~ (log.reason or ''))|lower }}">
+                        <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">
+                            {{ log.timestamp|wib_datetime }}
+                        </td>
+                        <td>
+                            <span class="cell-domain" style="font-family: var(--font-mono); font-weight: 600; color: #ffffff;">{{ log.domain_name }}</span>
+                        </td>
+                        <td>
+                            <span class="badge-operator">{{ log.operator }}</span>
+                        </td>
+                        <td>
+                            <span class="badge-status {{ log.previous_status }}">
+                                <span class="badge-dot"></span>
+                                {{ log.previous_status }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge-status {{ log.new_status }}">
+                                <span class="badge-dot"></span>
+                                {{ log.new_status }}
+                            </span>
+                        </td>
+                        <td style="font-size: 0.78rem; color: var(--text-muted);">
+                            {{ log.reason }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                            Belum ada catatan perubahan status operator tercatat.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="noStatusFilterMatchRow" style="display: none;">
+                        <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem 1rem; font-family: var(--font-mono);">
+                            Tidak ada data yang cocok dengan pencarian.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Switcher Tab
+function switchLogTab(tab) {
+    const btnBot = document.getElementById('tabBtnBotLogs');
+    const btnStatus = document.getElementById('tabBtnStatusLogs');
+    const panelBot = document.getElementById('tabContentBot');
+    const panelStatus = document.getElementById('tabContentStatus');
+
+    if (tab === 'bot') {
+        btnBot.classList.add('active');
+        btnBot.style.borderBottomColor = 'var(--accent-sky)';
+        btnBot.style.color = '#ffffff';
+
+        btnStatus.classList.remove('active');
+        btnStatus.style.borderBottomColor = 'transparent';
+        btnStatus.style.color = 'var(--text-dim)';
+
+        panelBot.style.display = 'block';
+        panelStatus.style.display = 'none';
+    } else {
+        btnStatus.classList.add('active');
+        btnStatus.style.borderBottomColor = 'var(--accent-sky)';
+        btnStatus.style.color = '#ffffff';
+
+        btnBot.classList.remove('active');
+        btnBot.style.borderBottomColor = 'transparent';
+        btnBot.style.color = 'var(--text-dim)';
+
+        panelStatus.style.display = 'block';
+        panelBot.style.display = 'none';
+    }
+}
+
+// Client-side Filter Bot Logs
+function filterBotLogs() {
+    const q = (document.getElementById('botInstantSearch').value || '').toLowerCase().trim();
+    const cmd = (document.getElementById('filterBotCommand').value || '').trim();
+    const status = (document.getElementById('filterBotStatus').value || '').trim();
+
+    const rows = document.querySelectorAll('#botLogTableBody tr.bot-log-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const searchData = row.getAttribute('data-search') || '';
+        const rowCmd = row.getAttribute('data-command') || '';
+        const rowStatus = row.getAttribute('data-status') || '';
+
+        const matchQ = !q || searchData.includes(q);
+        const matchCmd = !cmd || rowCmd === cmd;
+        const matchStatus = !status || rowStatus === status;
+
+        if (matchQ && matchCmd && matchStatus) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const badge = document.getElementById('botLogCountBadge');
+    if (badge) {
+        badge.innerText = visibleCount + ' log';
+    }
+
+    const noMatchRow = document.getElementById('noFilterMatchRow');
+    if (noMatchRow) {
+        noMatchRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+}
+
+// Client-side Filter Status Logs
+function filterStatusLogs() {
+    const q = (document.getElementById('statusInstantSearch').value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#statusLogTableBody tr.status-log-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const searchData = row.getAttribute('data-search') || '';
+        if (!q || searchData.includes(q)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const badge = document.getElementById('statusLogCountBadge');
+    if (badge) {
+        badge.innerText = visibleCount + ' log';
+    }
+
+    const noMatchRow = document.getElementById('noStatusFilterMatchRow');
+    if (noMatchRow) {
+        noMatchRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+}
+</script>
 {% endblock %}

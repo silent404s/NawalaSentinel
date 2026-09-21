@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}Manajemen Pelanggan — NawalaSentinel{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+        <h1 class="page-title">Manajemen Pelanggan & Whitelist Bot</h1>
+        <p class="page-subtitle">Kelola pelanggan sewa bot Telegram bulanan, kuota paket domain, dan whitelist ID grup</p>
+    </div>
+    <button type="button" class="btn btn-primary" id="btnOpenAddCustomerModal" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Tambah Pelanggan Baru
+    </button>
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="stats-grid" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(56, 189, 248, 0.1); color: var(--accent-sky);">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statTotalCustomers">{{ total_tenants }}</div>
+            <div class="stat-label">Total Pelanggan</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: var(--accent-emerald);">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statActiveCustomers" style="color: var(--accent-emerald);">{{ active_count }}</div>
+            <div class="stat-label">Langganan Aktif</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-rose);">
+            <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statExpiredCustomers" style="color: var(--accent-rose);">{{ expired_count }}</div>
+            <div class="stat-label">Sewa Berakhir / Nonaktif</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
+            <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="statTotalQuota">{{ total_quota }}</div>
+            <div class="stat-label">Total Kapasitas Domain</div>
+        </div>
+    </div>
+</div>
+
+<!-- Controls Bar (Search & Counter) -->
+<div class="table-controls-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; gap: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Daftar Grup / Pelanggan Terdaftar</span>
+        <span class="badge-count" style="font-family: var(--font-mono); font-size: 0.72rem; background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid var(--border-color); color: var(--accent-sky);" id="customerCountBadge">{{ tenants|length }} grup</span>
+    </div>
+    <div class="filter-search-box" style="position: relative; min-width: 280px;">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; width: 14px; height: 14px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="customerInstantSearch" class="form-control filter-search-input" placeholder="Cari nama grup, kontak, atau Chat ID..." style="padding-left: 2.2rem; font-size: 0.82rem; height: 32px; width: 100%;">
+    </div>
+</div>
+
+<!-- Table Panel -->
+<div class="table-panel">
+    <div class="table-responsive">
+        <table class="compact-table" id="customersDataTable" style="min-width: 1050px; table-layout: fixed; width: 100%;">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Pelanggan & Kontak</th>
+                    <th style="width: 14%;">ID Grup Telegram</th>
+                    <th style="width: 18%;">Paket & Kuota Domain</th>
+                    <th style="width: 17%;">Masa Sewa & Status</th>
+                    <th style="width: 11%;">Catatan</th>
+                    <th style="width: 20%; text-align: right; min-width: 240px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="customerTableBody">
+                {% for t in tenants %}
+                <tr id="row-customer-{{ t.id }}" class="customer-row-item" data-search="{{ (t.name ~ ' ' ~ (t.contact or '') ~ ' ' ~ t.telegram_chat_id)|lower }}">
+                    <td>
+                        <div style="font-weight: 700; color: #ffffff; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ t.name }}">{{ t.name }}</div>
+                        {% if t.contact %}
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ t.contact }}">
+                            📞 {{ t.contact }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span style="font-family: var(--font-mono); font-size: 0.78rem; background: rgba(255,255,255,0.06); padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); color: var(--accent-sky); display: inline-block;">
+                            {{ t.telegram_chat_id }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="font-size: 0.82rem; font-weight: 600; color: #ffffff;">
+                            Paket {{ (t.package_quota // 10) }} (Maks. {{ t.package_quota }} Domain)
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px;">
+                            Terpakai: <strong style="color: var(--accent-emerald);">{{ t.domain_count }}</strong> / {{ t.package_quota }}
+                        </div>
+                    </td>
+                    <td>
+                        {% if t.is_expired %}
+                        <span class="badge-status BLOCKED" style="font-size: 0.72rem;">
+                            <span class="badge-dot"></span> Habis / Nonaktif
+                        </span>
+                        {% else %}
+                        <span class="badge-status NORMAL" style="font-size: 0.72rem;">
+                            <span class="badge-dot"></span> Aktif ({{ t.remaining_days }} hari lagi)
+                        </span>
+                        {% endif %}
+                        <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 3px; font-family: var(--font-mono);">
+                            s/d {{ t.expired_date|wib_datetime }}
+                        </div>
+                    </td>
+                    <td style="font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ t.notes or '-' }}">
+                        {{ t.notes or '-' }}
+                    </td>
+                    <td class="actions-cell" style="text-align: right; white-space: nowrap; overflow: visible;">
+                        <div class="actions-btn-group">
+                            <button type="button" class="btn btn-secondary btn-xs btn-view-domains" data-id="{{ t.id }}" data-name="{{ t.name }}" title="Lihat daftar domain grup ini">
+                                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                                <span>Domain ({{ t.domain_count }})</span>
+                            </button>
+                            <button type="button" class="btn btn-success btn-xs btn-renew-customer" data-id="{{ t.id }}" data-name="{{ t.name }}" title="Perpanjang sewa 30 hari">
+                                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                                <span>+30 Hari</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-xs btn-edit-customer" data-customer='{{ t|tojson }}' title="Edit data pelanggan">
+                                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-xs btn-delete-customer" data-id="{{ t.id }}" data-name="{{ t.name }}" title="Hapus pelanggan">
+                                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 3rem 1rem; font-family: var(--font-mono);">
+                        Belum ada pelanggan terdaftar. Klik tombol <strong>"Tambah Pelanggan Baru"</strong> di atas untuk menambahkan whitelist grup Telegram.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= MODAL: TAMBAH PELANGGAN ================= -->
+<div class="modal-overlay" id="addCustomerModal" style="display: none;">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Tambah Pelanggan & Whitelist Grup</h3>
+            <button type="button" class="btn-close-modal" id="btnCloseAddModal">&times;</button>
+        </div>
+        <form id="formAddCustomer">
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">Nama Pelanggan / Grup: <span style="color: var(--accent-rose);">*</span></label>
+                    <input type="text" name="name" class="form-control" placeholder="Contoh: VIP Member Alpha" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">Kontak Pengguna (WA / Telegram):</label>
+                    <input type="text" name="contact" class="form-control" placeholder="Contoh: @member_vip / 08123456789">
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">ID Grup Telegram: <span style="color: var(--accent-rose);">*</span></label>
+                    <input type="text" name="telegram_chat_id" class="form-control" placeholder="Contoh: -100123456789" required>
+                    <small style="color: var(--text-dim); font-size: 0.72rem; display: block; margin-top: 4px;">
+                        Grup harus berupa supergroup / grup Telegram (biasanya berawalan <code>-100...</code>).
+                    </small>
+                </div>
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Paket Kuota Domain:</label>
+                        <select name="package_quota" class="form-control">
+                            <option value="10">Paket 1 (10 Domain)</option>
+                            <option value="20" selected>Paket 2 (20 Domain)</option>
+                            <option value="30">Paket 3 (30 Domain)</option>
+                            <option value="40">Paket 4 (40 Domain)</option>
+                            <option value="50">Paket 5 (50 Domain)</option>
+                            <option value="100">Paket 10 (100 Domain)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Masa Sewa (Hari):</label>
+                        <input type="number" name="duration_days" class="form-control" value="30" min="1" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Catatan Tambahan:</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Catatan opsional mengenai pelanggan ini..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnCancelAdd">Batal</button>
+                <button type="submit" class="btn btn-primary" id="btnSubmitAdd">Simpan & Whitelist</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= MODAL: EDIT PELANGGAN ================= -->
+<div class="modal-overlay" id="editCustomerModal" style="display: none;">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit Data Pelanggan</h3>
+            <button type="button" class="btn-close-modal" id="btnCloseEditModal">&times;</button>
+        </div>
+        <form id="formEditCustomer">
+            <input type="hidden" id="editCustomerId" name="id">
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">Nama Pelanggan / Grup:</label>
+                    <input type="text" id="editCustomerName" name="name" class="form-control" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">Kontak Pengguna:</label>
+                    <input type="text" id="editCustomerContact" name="contact" class="form-control">
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">ID Grup Telegram:</label>
+                    <input type="text" id="editCustomerChatId" name="telegram_chat_id" class="form-control" required>
+                </div>
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Paket Kuota Domain:</label>
+                        <select id="editCustomerQuota" name="package_quota" class="form-control">
+                            <option value="10">Paket 1 (10 Domain)</option>
+                            <option value="20">Paket 2 (20 Domain)</option>
+                            <option value="30">Paket 3 (30 Domain)</option>
+                            <option value="40">Paket 4 (40 Domain)</option>
+                            <option value="50">Paket 5 (50 Domain)</option>
+                            <option value="100">Paket 10 (100 Domain)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status Langganan:</label>
+                        <select id="editCustomerIsActive" name="is_active" class="form-control">
+                            <option value="true">Aktif</option>
+                            <option value="false">Nonaktif / Suspend</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Catatan Tambahan:</label>
+                    <textarea id="editCustomerNotes" name="notes" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnCancelEdit">Batal</button>
+                <button type="submit" class="btn btn-primary" id="btnSubmitEdit">Perbarui Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= MODAL: LIHAT DOMAIN PELANGGAN ================= -->
+<div class="modal-overlay" id="viewDomainsModal" style="display: none;">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+            <div>
+                <h3 class="modal-title" id="viewDomainsTitle">Daftar Domain Pelanggan</h3>
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;" id="viewDomainsSubtitle"></p>
+            </div>
+            <button type="button" class="btn-close-modal" id="btnCloseViewDomainsModal">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+            <div id="domainsLoading" style="text-align: center; padding: 2rem; color: var(--text-dim);">
+                <span class="spinner"></span> Memuat daftar domain...
+            </div>
+            <div id="domainsContainer" style="display: none;">
+                <table class="compact-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">#</th>
+                            <th>Nama Domain</th>
+                            <th>Status Nawala</th>
+                            <th>Status CF</th>
+                        </tr>
+                    </thead>
+                    <tbody id="domainsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="btnCloseViewDomainsBtn">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Add Modal
+    const addModal = document.getElementById("addCustomerModal");
+    const btnOpenAdd = document.getElementById("btnOpenAddCustomerModal");
+    const btnCloseAdd = document.getElementById("btnCloseAddModal");
+    const btnCancelAdd = document.getElementById("btnCancelAdd");
+    const formAdd = document.getElementById("formAddCustomer");
+
+    btnOpenAdd.addEventListener("click", () => { addModal.style.display = "flex"; });
+    btnCloseAdd.addEventListener("click", () => { addModal.style.display = "none"; });
+    btnCancelAdd.addEventListener("click", () => { addModal.style.display = "none"; });
+
+    formAdd.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(formAdd);
+        const submitBtn = document.getElementById("btnSubmitAdd");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner"></span> Menyimpan...`;
+
+        try {
+            const res = await fetch("/api/customers", {
+                method: "POST",
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.message, "success");
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(data.message || "Gagal mendaftarkan pelanggan.", "error");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `Simpan & Whitelist`;
+            }
+        } catch (err) {
+            showToast("Kesalahan koneksi ke server.", "error");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Simpan & Whitelist`;
+        }
+    });
+
+    // Edit Modal
+    const editModal = document.getElementById("editCustomerModal");
+    const btnCloseEdit = document.getElementById("btnCloseEditModal");
+    const btnCancelEdit = document.getElementById("btnCancelEdit");
+    const formEdit = document.getElementById("formEditCustomer");
+
+    btnCloseEdit.addEventListener("click", () => { editModal.style.display = "none"; });
+    btnCancelEdit.addEventListener("click", () => { editModal.style.display = "none"; });
+
+    document.querySelectorAll(".btn-edit-customer").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const c = JSON.parse(btn.dataset.customer);
+            document.getElementById("editCustomerId").value = c.id;
+            document.getElementById("editCustomerName").value = c.name;
+            document.getElementById("editCustomerContact").value = c.contact || "";
+            document.getElementById("editCustomerChatId").value = c.telegram_chat_id;
+            document.getElementById("editCustomerQuota").value = c.package_quota;
+            document.getElementById("editCustomerIsActive").value = c.is_active ? "true" : "false";
+            document.getElementById("editCustomerNotes").value = c.notes || "";
+            editModal.style.display = "flex";
+        });
+    });
+
+    formEdit.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const customerId = document.getElementById("editCustomerId").value;
+        const formData = new FormData(formEdit);
+        const submitBtn = document.getElementById("btnSubmitEdit");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner"></span> Menyimpan...`;
+
+        try {
+            const res = await fetch(`/api/customers/${customerId}`, {
+                method: "PUT",
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.message, "success");
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(data.message || "Gagal memperbarui data.", "error");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `Perbarui Data`;
+            }
+        } catch (err) {
+            showToast("Kesalahan koneksi ke server.", "error");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Perbarui Data`;
+        }
+    });
+
+    // Renew (+30 Hari)
+    document.querySelectorAll(".btn-renew-customer").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            if (!confirm(`Perpanjang masa sewa 30 hari untuk pelanggan '${name}'?`)) return;
+
+            btn.disabled = true;
+            try {
+                const formData = new FormData();
+                formData.append("days", "30");
+                const res = await fetch(`/api/customers/${id}/renew`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message, "success");
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showToast(data.message || "Gagal memperpanjang sewa.", "error");
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showToast("Kesalahan koneksi.", "error");
+                btn.disabled = false;
+            }
+        });
+    });
+
+    // Delete Customer
+    document.querySelectorAll(".btn-delete-customer").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            if (!confirm(`Hapus pelanggan '${name}'? Seluruh daftar domain milik grup ini juga akan dihapus dari monitoring.`)) return;
+
+            btn.disabled = true;
+            try {
+                const res = await fetch(`/api/customers/${id}`, {
+                    method: "DELETE"
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message, "success");
+                    const row = document.getElementById(`row-customer-${id}`);
+                    if (row) row.remove();
+                } else {
+                    showToast(data.message || "Gagal menghapus pelanggan.", "error");
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showToast("Kesalahan koneksi.", "error");
+                btn.disabled = false;
+            }
+        });
+    });
+
+    // View Domains Modal
+    const viewDomainsModal = document.getElementById("viewDomainsModal");
+    const btnCloseViewDomainsModal = document.getElementById("btnCloseViewDomainsModal");
+    const btnCloseViewDomainsBtn = document.getElementById("btnCloseViewDomainsBtn");
+
+    btnCloseViewDomainsModal.addEventListener("click", () => { viewDomainsModal.style.display = "none"; });
+    btnCloseViewDomainsBtn.addEventListener("click", () => { viewDomainsModal.style.display = "none"; });
+
+    document.querySelectorAll(".btn-view-domains").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            document.getElementById("viewDomainsTitle").innerText = `Domain Grup: ${name}`;
+            document.getElementById("domainsLoading").style.display = "block";
+            document.getElementById("domainsContainer").style.display = "none";
+            viewDomainsModal.style.display = "flex";
+
+            try {
+                const res = await fetch(`/api/customers/${id}/domains`);
+                const data = await res.json();
+                document.getElementById("domainsLoading").style.display = "none";
+                document.getElementById("domainsContainer").style.display = "block";
+
+                const tbody = document.getElementById("domainsTableBody");
+                tbody.innerHTML = "";
+
+                if (data.domains && data.domains.length > 0) {
+                    document.getElementById("viewDomainsSubtitle").innerText = `Total: ${data.domains.length} / ${data.tenant.package_quota} Domain (Diurutkan A-Z)`;
+                    data.domains.forEach((d, idx) => {
+                        const tr = document.createElement("tr");
+                        const statusClass = d.overall_status === "BLOCKED" ? "BLOCKED" : (d.overall_status === "NORMAL" ? "NORMAL" : "UNCHECKED");
+                        const cfClass = d.cf_status === "PHISHING" ? "BLOCKED" : "NORMAL";
+
+                        tr.innerHTML = `
+                            <td style="font-family: var(--font-mono); color: var(--text-dim);">${idx + 1}</td>
+                            <td><span class="cell-domain">${d.name}</span></td>
+                            <td>
+                                <span class="badge-status ${statusClass}">
+                                    <span class="badge-dot"></span> ${d.overall_status}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-status ${cfClass}">
+                                    <span class="badge-dot"></span> ${d.cf_status}
+                                </span>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    document.getElementById("viewDomainsSubtitle").innerText = `Belum ada domain terdaftar`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 2rem;">Grup ini belum mendaftarkan domain melalui bot (/add).</td></tr>`;
+                }
+            } catch (err) {
+                document.getElementById("domainsLoading").innerText = "Gagal memuat domain.";
+            }
+        });
+    });
+
+    // Instant Search for Customer Rows
+    const searchInput = document.getElementById("customerInstantSearch");
+    if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const rows = document.querySelectorAll(".customer-row-item");
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const searchData = row.dataset.search || "";
+                if (!query || searchData.includes(query)) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            const countBadge = document.getElementById("customerCountBadge");
+            if (countBadge) {
+                countBadge.textContent = `${visibleCount} grup`;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

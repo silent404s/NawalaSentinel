@@ -35,8 +35,8 @@ async def run_full_domain_scan():
 
         async with AsyncSessionLocal() as session:
             try:
-                # 1. Ambil seluruh domain beserta relasi user dari database
-                stmt = select(Domain).options(joinedload(Domain.user))
+                # 1. Ambil seluruh domain beserta relasi user & tenant dari database
+                stmt = select(Domain).options(joinedload(Domain.user), joinedload(Domain.tenant))
                 result = await session.execute(stmt)
                 domains = result.scalars().all()
 
@@ -44,8 +44,13 @@ async def run_full_domain_scan():
                     logger.info("ℹ️ Belum ada domain yang terdaftar di database.")
                     return
 
-                domain_map = {d.name: d for d in domains}
-                domain_names = list(domain_map.keys())
+                name_to_domains = {}
+                for d in domains:
+                    if d.name not in name_to_domains:
+                        name_to_domains[d.name] = []
+                    name_to_domains[d.name].append(d)
+
+                domain_names = list(name_to_domains.keys())
                 total_domains = len(domain_names)
 
                 chunk_size = settings.CHUNK_SIZE
@@ -61,7 +66,7 @@ async def run_full_domain_scan():
                     batch_results = await checker_engine.check_batch_domains(chunk_domains)
 
                     # Batch pre-fetch CheckResult untuk semua domain di chunk ini (mencegah N+1 query)
-                    chunk_domain_ids = [domain_map[d].id for d in chunk_domains if d in domain_map]
+                    chunk_domain_ids = [d.id for name in chunk_domains for d in name_to_domains.get(name, [])]
                     existing_results_map = {}
                     if chunk_domain_ids:
                         existing_stmt = select(CheckResult).where(CheckResult.domain_id.in_(chunk_domain_ids))
@@ -80,87 +85,150 @@ async def run_full_domain_scan():
                         new_cf_reason = domain_data.get("cf_reason", "")
                         operator_results = domain_data["operator_results"]
 
-                        domain_obj = domain_map.get(domain_name)
-                        if not domain_obj:
+                        target_domains = name_to_domains.get(domain_name, [])
+                        if not target_domains:
                             continue
 
-                        raw_old_cf = domain_obj.cf_status or "CLEAN"
-                        old_cf_status = "CLEAN" if raw_old_cf == "NORMAL" else raw_old_cf
+                        for domain_obj in target_domains:
+                            raw_old_cf = domain_obj.cf_status or "CLEAN"
+                            old_cf_status = "CLEAN" if raw_old_cf == "NORMAL" else raw_old_cf
+                            old_overall_status = domain_obj.overall_status or "UNCHECKED"
 
-                        # Cek apakah terjadi perubahan status Cloudflare (hanya jika ke/dari PHISHING)
-                        if old_cf_status != new_cf_status and old_cf_status != "UNCHECKED":
-                            logger.warning(f"⚠️ Perubahan Status Cloudflare {domain_name}: {old_cf_status} -> {new_cf_status}")
-                            await notifier.notify_cloudflare_status(
-                                domain_name=domain_name,
-                                cf_status=new_cf_status,
-                                cf_reason=new_cf_reason,
-                                isp_status=new_overall_status,
-                                chat_id=domain_obj.user.telegram_chat_id if domain_obj.user else None
-                            )
+                            # Cek apakah terjadi perubahan status Cloudflare (untuk pengguna personal/non-tenant)
+                            if old_cf_status != new_cf_status and old_cf_status != "UNCHECKED":
+                                logger.warning(f"⚠️ Perubahan Status Cloudflare {domain_name}: {old_cf_status} -> {new_cf_status}")
+                                if not (domain_obj.tenant and domain_obj.tenant.is_active):
+                                    await notifier.notify_cloudflare_status(
+                                        domain_name=domain_name,
+                                        cf_status=new_cf_status,
+                                        cf_reason=new_cf_reason,
+                                        isp_status=new_overall_status,
+                                        chat_id=domain_obj.user.telegram_chat_id if domain_obj.user else None
+                                    )
 
-                        existing_results = existing_results_map.get(domain_obj.id, {})
+                            existing_results = existing_results_map.get(domain_obj.id, {})
 
-                        # Update status per operator
-                        for operator_name, op_res in operator_results.items():
-                            old_op_status = existing_results[operator_name].status if operator_name in existing_results else "UNCHECKED"
-                            new_op_status = op_res["status"]
-                            block_reason = op_res["block_reason"]
-                            resolved_ips = op_res["resolved_ips"]
-                            latency_ms = op_res["latency_ms"]
+                            # Update status per operator & catat StatusLog
+                            for operator_name, op_res in operator_results.items():
+                                old_op_status = existing_results[operator_name].status if operator_name in existing_results else "UNCHECKED"
+                                new_op_status = op_res["status"]
+                                block_reason = op_res["block_reason"]
+                                resolved_ips = op_res["resolved_ips"]
+                                latency_ms = op_res["latency_ms"]
 
-                            # Cek apakah terjadi perubahan status untuk operator ini
-                            if old_op_status != new_op_status and old_op_status != "UNCHECKED":
-                                logger.warning(f"🚨 Perubahan Status Domain {domain_name} ({operator_name}): {old_op_status} -> {new_op_status}")
-                                
-                                # Catat ke StatusLog
-                                log_entry = StatusLog(
-                                    domain_id=domain_obj.id,
-                                    domain_name=domain_name,
-                                    operator=operator_name,
-                                    previous_status=old_op_status,
-                                    new_status=new_op_status,
-                                    reason=block_reason,
-                                    timestamp=now_jakarta_naive()
-                                )
-                                session.add(log_entry)
+                                # Cek apakah terjadi perubahan status untuk operator ini
+                                if old_op_status != new_op_status and old_op_status != "UNCHECKED":
+                                    logger.warning(f"🚨 Perubahan Status Domain {domain_name} ({operator_name}): {old_op_status} -> {new_op_status}")
+                                    
+                                    # Catat ke StatusLog
+                                    log_entry = StatusLog(
+                                        domain_id=domain_obj.id,
+                                        domain_name=domain_name,
+                                        operator=operator_name,
+                                        previous_status=old_op_status,
+                                        new_status=new_op_status,
+                                        reason=block_reason,
+                                        timestamp=now_jakarta_naive()
+                                    )
+                                    session.add(log_entry)
 
-                                # Kirim Notifikasi Telegram / Webhook jika berubah menjadi BLOCKED atau pulih ke NORMAL
-                                await notifier.notify_status_change(
-                                    domain_name=domain_name,
-                                    operator=operator_name,
-                                    old_status=old_op_status,
-                                    new_status=new_op_status,
-                                    reason=block_reason,
-                                    ips=resolved_ips,
-                                    cf_status=new_cf_status,
-                                    chat_id=domain_obj.user.telegram_chat_id if domain_obj.user else None
-                                )
+                                    # Kirim Notifikasi untuk pengguna personal / non-tenant
+                                    if not (domain_obj.tenant and domain_obj.tenant.is_active):
+                                        await notifier.notify_status_change(
+                                            domain_name=domain_name,
+                                            operator=operator_name,
+                                            old_status=old_op_status,
+                                            new_status=new_op_status,
+                                            reason=block_reason,
+                                            ips=resolved_ips,
+                                            cf_status=new_cf_status,
+                                            chat_id=domain_obj.user.telegram_chat_id if domain_obj.user else None
+                                        )
 
-                            # Simpan/Update CheckResult
-                            if operator_name in existing_results:
-                                check_res_obj = existing_results[operator_name]
-                                check_res_obj.status = new_op_status
-                                check_res_obj.resolved_ips = resolved_ips
-                                check_res_obj.block_reason = block_reason
-                                check_res_obj.latency_ms = latency_ms
-                                check_res_obj.checked_at = now_jakarta_naive()
-                            else:
-                                new_res_obj = CheckResult(
-                                    domain_id=domain_obj.id,
-                                    operator=operator_name,
-                                    status=new_op_status,
-                                    resolved_ips=resolved_ips,
-                                    block_reason=block_reason,
-                                    latency_ms=latency_ms,
-                                    checked_at=now_jakarta_naive()
-                                )
-                                session.add(new_res_obj)
+                                # Simpan/Update CheckResult
+                                if operator_name in existing_results:
+                                    check_res_obj = existing_results[operator_name]
+                                    check_res_obj.status = new_op_status
+                                    check_res_obj.resolved_ips = resolved_ips
+                                    check_res_obj.block_reason = block_reason
+                                    check_res_obj.latency_ms = latency_ms
+                                    check_res_obj.checked_at = now_jakarta_naive()
+                                else:
+                                    new_res_obj = CheckResult(
+                                        domain_id=domain_obj.id,
+                                        operator=operator_name,
+                                        status=new_op_status,
+                                        resolved_ips=resolved_ips,
+                                        block_reason=block_reason,
+                                        latency_ms=latency_ms,
+                                        checked_at=now_jakarta_naive()
+                                    )
+                                    session.add(new_res_obj)
 
-                        # Update Domain Overall Status, CF Status, & Timestamp
-                        domain_obj.overall_status = new_overall_status
-                        domain_obj.cf_status = new_cf_status
-                        domain_obj.cf_reason = new_cf_reason
-                        domain_obj.last_checked_at = now_jakarta_naive()
+                            # SISTEM NOTIFIKASI TENANT (Grup Pelanggan):
+                            # Peringatan Pertama, Peringatan Berkala (Reminder), & Notifikasi Pemulihan
+                            if domain_obj.tenant and domain_obj.tenant.is_active:
+                                is_now_bad = (new_overall_status in ("BLOCKED", "MIXED") or new_cf_status == "PHISHING")
+                                was_old_bad = (old_overall_status in ("BLOCKED", "MIXED") or old_cf_status == "PHISHING")
+                                now_dt = now_jakarta_naive()
+
+                                # 1. Pemulihan (Recovery)
+                                if not is_now_bad and was_old_bad:
+                                    await notifier.notify_tenant_domain_alert(
+                                        domain_name=domain_name,
+                                        tenant=domain_obj.tenant,
+                                        overall_status=new_overall_status,
+                                        cf_status=new_cf_status,
+                                        operator_results=operator_results,
+                                        reason="Domain kembali normal",
+                                        is_recovery=True
+                                    )
+                                    domain_obj.last_alerted_at = None
+
+                                # 2. Baru Terblokir / Phishing (Peringatan Pertama)
+                                elif is_now_bad and not was_old_bad:
+                                    await notifier.notify_tenant_domain_alert(
+                                        domain_name=domain_name,
+                                        tenant=domain_obj.tenant,
+                                        overall_status=new_overall_status,
+                                        cf_status=new_cf_status,
+                                        operator_results=operator_results,
+                                        reason=new_cf_reason if new_cf_status == "PHISHING" else "Terdeteksi pemblokiran ISP Nawala",
+                                        is_recovery=False,
+                                        is_reminder=False
+                                    )
+                                    domain_obj.last_alerted_at = now_dt
+
+                                # 3. Masih Terblokir & Belum Dihapus (Peringatan Kedua & Seterusnya - Reminder)
+                                elif is_now_bad and was_old_bad:
+                                    should_remind = False
+                                    if domain_obj.last_alerted_at is None:
+                                        should_remind = True
+                                    else:
+                                        elapsed = (now_dt - domain_obj.last_alerted_at).total_seconds()
+                                        # Kirim peringatan ulang pada setiap siklus pengecekan berikutnya (minimal 3-4 menit)
+                                        min_reminder_interval = max(180, (settings.CHECK_INTERVAL_MINUTES * 60) - 60)
+                                        if elapsed >= min_reminder_interval:
+                                            should_remind = True
+
+                                    if should_remind:
+                                        await notifier.notify_tenant_domain_alert(
+                                            domain_name=domain_name,
+                                            tenant=domain_obj.tenant,
+                                            overall_status=new_overall_status,
+                                            cf_status=new_cf_status,
+                                            operator_results=operator_results,
+                                            reason=new_cf_reason if new_cf_status == "PHISHING" else "Domain masih terblokir dan belum dihapus",
+                                            is_recovery=False,
+                                            is_reminder=True
+                                        )
+                                        domain_obj.last_alerted_at = now_dt
+
+                            # Update Domain Overall Status, CF Status, & Timestamp
+                            domain_obj.overall_status = new_overall_status
+                            domain_obj.cf_status = new_cf_status
+                            domain_obj.cf_reason = new_cf_reason
+                            domain_obj.last_checked_at = now_jakarta_naive()
 
                     await session.commit()
                     logger.info(f"✅ Sesi {chunk_idx}/{total_chunks} selesai & commit ke DB.")
@@ -182,6 +250,7 @@ async def run_full_domain_scan():
 def start_scheduler():
     """
     Menjalankan scheduler otomatis dengan interval waktu yang dikonfigurasi.
+    Serta langsung memicu siklus pengecekan awal saat aplikasi mulai berjalan.
     """
     interval_mins = settings.CHECK_INTERVAL_MINUTES
     scheduler.add_job(
@@ -189,7 +258,8 @@ def start_scheduler():
         'interval',
         minutes=interval_mins,
         id='nawala_domain_scan_job',
-        replace_existing=True
+        replace_existing=True,
+        next_run_time=datetime.now()
     )
     scheduler.start()
     logger.info(f"🚀 Background Scheduler aktif! Pengecekan otomatis berjalan setiap {interval_mins} menit sekali.")

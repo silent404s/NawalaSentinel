@@ -54,7 +54,6 @@ async def init_db():
         
         # Migrasi otomatis untuk SQLite (jika kolom user_id belum ada pada tabel domains)
         def migrate_sqlite_columns(sync_conn):
-            import sqlite3
             cursor = sync_conn.connection.cursor()
             cursor.execute("PRAGMA table_info(domains)")
             columns = [row[1] for row in cursor.fetchall()]
@@ -66,6 +65,31 @@ async def init_db():
                 cursor.execute("UPDATE domains SET cf_status = 'CLEAN' WHERE cf_status IS NULL")
             if "cf_reason" not in columns:
                 cursor.execute("ALTER TABLE domains ADD COLUMN cf_reason TEXT")
+
+            if "tenant_id" not in columns:
+                cursor.execute("ALTER TABLE domains ADD COLUMN tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE")
+            if "last_alerted_at" not in columns:
+                cursor.execute("ALTER TABLE domains ADD COLUMN last_alerted_at DATETIME")
+
+            # Update index agar name tidak unik global melainkan unik per tenant
+            cursor.execute("DROP INDEX IF EXISTS ix_domains_name")
+            cursor.execute("CREATE INDEX IF NOT EXISTS ix_domains_name ON domains (name)")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_domains_tenant_name ON domains (tenant_id, name)")
+
+            # Migrasi kolom tabel users (2FA, Lockout, Backup Codes)
+            cursor.execute("PRAGMA table_info(users)")
+            user_cols = [row[1] for row in cursor.fetchall()]
+            if "totp_secret" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN totp_secret VARCHAR(255)")
+            if "is_totp_enabled" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN is_totp_enabled BOOLEAN DEFAULT 0")
+            if "failed_login_attempts" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0")
+            if "locked_until" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN locked_until DATETIME")
+            if "backup_codes" not in user_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN backup_codes TEXT")
+
             sync_conn.connection.commit()
 
         await conn.run_sync(migrate_sqlite_columns)
@@ -95,6 +119,7 @@ async def init_db():
     async with AsyncSessionLocal() as session:
         from app.models import AppSetting
         from app.notifier import notifier
+        from app.checker import checker_engine
         from sqlalchemy.future import select
 
         res = await session.execute(select(AppSetting))
@@ -109,6 +134,13 @@ async def init_db():
                 settings.TELEGRAM_ALERTS_ENABLED = (row.value.lower() in ("true", "1", "t"))
             elif row.key == "CHECK_INTERVAL_MINUTES" and row.value:
                 settings.CHECK_INTERVAL_MINUTES = int(row.value)
+            elif row.key == "CHUNK_SIZE" and row.value:
+                settings.CHUNK_SIZE = int(row.value)
+            elif row.key == "CONCURRENT_CHECKS" and row.value:
+                settings.CONCURRENT_CHECKS = int(row.value)
+                checker_engine.update_concurrency(settings.CONCURRENT_CHECKS)
+            elif row.key == "CHUNK_DELAY_SECONDS" and row.value:
+                settings.CHUNK_DELAY_SECONDS = float(row.value)
             elif row.key == "LOCAL_TEST_MODE":
                 settings.LOCAL_TEST_MODE = (row.value.lower() in ("true", "1", "t"))
             elif row.key == "TELKOMSEL_PROXY":

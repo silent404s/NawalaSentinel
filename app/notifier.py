@@ -2,7 +2,6 @@ import html
 import httpx
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
 
 from app.config import settings
 from app.utils.timezone import now_jakarta
@@ -24,11 +23,12 @@ class TelegramNotifier:
         Kirim pesan ke Telegram Chat / Channel menggunakan Bot API.
         """
         target_chat_id = chat_id or self.chat_id
-        if not self.bot_token or not target_chat_id:
+        token = self.bot_token or settings.TELEGRAM_BOT_TOKEN
+        if not token or not target_chat_id:
             logger.warning("Telegram Bot Token atau Chat ID belum dikonfigurasi.")
             return False
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
             "chat_id": target_chat_id,
             "text": text,
@@ -165,6 +165,81 @@ class TelegramNotifier:
             except Exception as e:
                 logger.error(f"Error mengirim Webhook alert: {e}")
                 return False
+
+    async def notify_tenant_domain_alert(
+        self,
+        domain_name: str,
+        tenant: Any,
+        overall_status: str,
+        cf_status: str,
+        operator_results: Optional[Dict[str, Any]] = None,
+        reason: str = "Terdeteksi pemblokiran DNS / Sinkhole",
+        is_recovery: bool = False,
+        is_reminder: bool = False
+    ):
+        """
+        Mengirim notifikasi khusus ke grup pelanggan / tenant:
+        - is_recovery=True: Notifikasi domain kembali normal
+        - is_reminder=True: Peringatan kedua dst. yang super simpel & ringkas agar tidak memenuhi layar
+        - is_reminder=False: Peringatan pertama yang jelas, padat, dan disertai rekomendasi /replace & /del
+        """
+        if not tenant or not tenant.telegram_chat_id:
+            return
+
+        chat_id = tenant.telegram_chat_id
+        tenant_name = tenant.name if hasattr(tenant, "name") else "Grup"
+        safe_domain = html.escape(domain_name)
+        safe_tenant = html.escape(tenant_name)
+        timestamp_str = now_jakarta().strftime("%d %b %Y %H:%M WIB")
+
+        # 1. NOTIFIKASI DOMAIN KEMBALI NORMAL
+        if is_recovery:
+            message = (
+                "✅ <b>Pemberitahuan: Domain Kembali Normal</b>\n\n"
+                f"🌐 Domain: <code>{safe_domain}</code>\n"
+                f"📊 Status: <b>NORMAL / CLEAN</b>\n"
+                f"🏷️ Grup: <b>{safe_tenant}</b>\n"
+                f"⏰ Waktu: {timestamp_str}\n\n"
+                "Domain sudah dapat diakses normal kembali di seluruh jaringan ISP."
+            )
+            await self.send_telegram_message(message, chat_id=chat_id)
+            return
+
+        # 2. PERINGATAN KEDUA & SETERUSNYA (REMINDER ALERT - SUPER SIMPEL)
+        if is_reminder:
+            if cf_status == "PHISHING" and overall_status in ("BLOCKED", "MIXED"):
+                header = f"❌ <b>{safe_domain} Komdigi & Phishing Alert!</b> ❌"
+            elif cf_status == "PHISHING":
+                header = f"⚠️ <b>{safe_domain} Phishing Alert!</b> ⚠️"
+            else:
+                header = f"❌ <b>{safe_domain} Komdigi Alert!</b> ❌"
+
+            message = (
+                f"{header}\n\n"
+                f"⏰ Pengecekan: {timestamp_str}\n\n"
+                f"⚡ Ganti: <code>/replace {safe_domain} linkbaru.com</code>\n"
+                f"🗑️ Hapus: <code>/del {safe_domain}</code>"
+            )
+            await self.send_telegram_message(message, chat_id=chat_id)
+            return
+
+        # 3. PERINGATAN PERTAMA (FIRST ALERT - ULTRA RINGKAS)
+        if cf_status == "PHISHING" and overall_status in ("BLOCKED", "MIXED"):
+            header = "🚨 <b>Peringatan: Nawala & Phishing!</b>"
+        elif cf_status == "PHISHING":
+            header = "⚠️ <b>Peringatan: Cloudflare Phishing!</b>"
+        else:
+            header = "🔴 <b>Peringatan: Domain Terblokir!</b>"
+
+        message = (
+            f"{header}\n\n"
+            f"❌ <b>{safe_domain}</b> ❌\n\n"
+            f"💡 <b>Rekomendasi Tindakan:</b>\n"
+            f"• Ganti: <code>/replace {safe_domain} linkbaru.com</code>\n"
+            f"• Hapus: <code>/del {safe_domain}</code>"
+        )
+
+        await self.send_telegram_message(message, chat_id=chat_id)
 
     async def send_test_alert(self) -> bool:
         """

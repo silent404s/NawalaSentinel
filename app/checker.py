@@ -3,9 +3,10 @@ import time
 import logging
 import re
 import dns.asyncresolver
+import dns.resolver
 import dns.exception
 import httpx
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 from app.config import settings
 
@@ -30,50 +31,151 @@ class OperatorBlockChecker:
         self._tp_csrf = None
         self._tp_client = None
         self._tp_lock = asyncio.Lock()
+        self._tp_semaphore = asyncio.Semaphore(2)  # Maksimal 2 request simultan ke Komdigi agar terbebas dari HTTP 503
 
-    async def check_trustpositif(self, domain: str) -> bool:
-        """
-        Pengecekan ke Database Resmi TrustPositif Komdigi / Nawala.
-        Return True jika domain terdaftar sebagai diblokir (Status: 'Ada').
-        """
-        host = domain.split("/")[0].strip().lower()
+    def update_concurrency(self, new_limit: int):
+        """Update semaphore limit for concurrent checks dynamically."""
+        self.semaphore = asyncio.Semaphore(max(5, new_limit))
+        logger.info(f"Concurrency limit updated to {new_limit}")
+
+    async def _get_tp_csrf(self, force_refresh: bool = False) -> Optional[str]:
+        """Ambil atau perbarui CSRF token untuk TrustPositif Komdigi secara thread-safe."""
         async with self._tp_lock:
             if self._tp_client is None or self._tp_client.is_closed:
-                self._tp_client = httpx.AsyncClient(verify=False, timeout=6.0)
+                self._tp_client = httpx.AsyncClient(verify=False, timeout=8.0)
 
-            # Ambil CSRF token jika belum ada
-            if not self._tp_csrf:
+            if not self._tp_csrf or force_refresh:
                 try:
-                    r = await self._tp_client.get('https://trustpositif.komdigi.go.id/', timeout=4.0)
+                    r = await self._tp_client.get('https://trustpositif.komdigi.go.id/', timeout=5.0)
                     m = re.search(r"['\"]csrf_token['\"]\s*:\s*['\"]([a-f0-9]+)['\"]", r.text)
                     if m:
                         self._tp_csrf = m.group(1)
+                    else:
+                        logger.warning("CSRF token tidak ditemukan pada respons HTML TrustPositif.")
                 except Exception as e:
                     logger.warning(f"Gagal mengambil token TrustPositif: {e}")
+            return self._tp_csrf
 
-        if self._tp_csrf:
+    async def check_trustpositif_bulk(self, domains: List[str]) -> Dict[str, bool]:
+        """
+        Pengecekan massal ke Database Resmi TrustPositif Komdigi / Nawala dalam 1 atau beberapa request POST.
+        Mengirimkan daftar domain yang dipisahkan baris baru (\\n) untuk menghindari rate-limit & HTTP 503.
+        Return: Dict[domain_clean, is_blocked: bool]
+        """
+        results: Dict[str, bool] = {}
+        if not domains:
+            return results
+
+        clean_hosts = []
+        host_set = set()
+        for d in domains:
+            h = d.split("/")[0].strip().lower()
+            if h and h not in host_set:
+                host_set.add(h)
+                clean_hosts.append(h)
+                results[h] = False
+
+        # Batching maksimal 30 domain per request
+        batch_size = 30
+        batches = [clean_hosts[i:i + batch_size] for i in range(0, len(clean_hosts), batch_size)]
+
+        for batch in batches:
+            success = False
+            for attempt in range(3):
+                csrf = await self._get_tp_csrf(force_refresh=(attempt > 0))
+                if not csrf:
+                    await asyncio.sleep(1.0)
+                    continue
+
+                try:
+                    async with self._tp_semaphore:
+                        res = await self._tp_client.post(
+                            'https://trustpositif.komdigi.go.id/Rest_server/getrecordsname_home',
+                            data={'csrf_token': csrf, 'name': '\n'.join(batch)},
+                            headers={
+                                'User-Agent': self.headers['User-Agent'],
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Referer': 'https://trustpositif.komdigi.go.id/'
+                            },
+                            timeout=10.0
+                        )
+
+                    if res.status_code == 200:
+                        data = res.json()
+                        for item in data.get('values', []):
+                            item_domain = item.get('Domain', '').strip().lower()
+                            is_ada = item.get('Status', '').strip().lower() == 'ada'
+                            if item_domain in results:
+                                results[item_domain] = is_ada
+                        success = True
+                        break
+                    elif res.status_code in (503, 429):
+                        logger.warning(f"TrustPositif bulk attempt {attempt+1} got HTTP {res.status_code}, retrying...")
+                        await asyncio.sleep(1.2 * (attempt + 1))
+                    else:
+                        logger.warning(f"TrustPositif bulk attempt {attempt+1} got HTTP {res.status_code}, resetting CSRF...")
+                        async with self._tp_lock:
+                            self._tp_csrf = None
+                        await asyncio.sleep(0.8)
+                except Exception as e:
+                    logger.warning(f"Error query TrustPositif bulk attempt {attempt+1}: {e}")
+                    async with self._tp_lock:
+                        self._tp_csrf = None
+                    await asyncio.sleep(0.8)
+
+            if not success:
+                logger.error(f"Gagal memeriksa batch TrustPositif setelah 3 percobaan: {batch}")
+
+        return results
+
+    async def check_trustpositif(self, domain: str) -> bool:
+        """
+        Pengecekan ke Database Resmi TrustPositif Komdigi / Nawala untuk 1 domain.
+        Dilengkapi semaphore rate-limit & retry loop untuk mencegah false negative akibat HTTP 503.
+        Return True jika domain terdaftar sebagai diblokir (Status: 'Ada').
+        """
+        host = domain.split("/")[0].strip().lower()
+        if not host:
+            return False
+
+        for attempt in range(3):
+            csrf = await self._get_tp_csrf(force_refresh=(attempt > 0))
+            if not csrf:
+                await asyncio.sleep(0.8)
+                continue
+
             try:
-                res = await self._tp_client.post(
-                    'https://trustpositif.komdigi.go.id/Rest_server/getrecordsname_home',
-                    data={'csrf_token': self._tp_csrf, 'name': host},
-                    headers={
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Referer': 'https://trustpositif.komdigi.go.id/'
-                    },
-                    timeout=5.0
-                )
+                async with self._tp_semaphore:
+                    res = await self._tp_client.post(
+                        'https://trustpositif.komdigi.go.id/Rest_server/getrecordsname_home',
+                        data={'csrf_token': csrf, 'name': host},
+                        headers={
+                            'User-Agent': self.headers['User-Agent'],
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Referer': 'https://trustpositif.komdigi.go.id/'
+                        },
+                        timeout=7.0
+                    )
+
                 if res.status_code == 200:
                     data = res.json()
                     for item in data.get('values', []):
-                        if item.get('Status', '').lower() == 'ada':
+                        if item.get('Status', '').strip().lower() == 'ada':
                             return True
+                    return False
+                elif res.status_code in (503, 429):
+                    logger.warning(f"TrustPositif {domain} attempt {attempt+1} got HTTP {res.status_code}, retrying...")
+                    await asyncio.sleep(1.0 * (attempt + 1))
                 else:
-                    # Reset CSRF jika status code bukan 200 (token invalid/expired)
-                    self._tp_csrf = None
+                    async with self._tp_lock:
+                        self._tp_csrf = None
+                    await asyncio.sleep(0.8)
             except Exception as e:
-                logger.warning(f"Error query TrustPositif untuk {domain}: {e}")
-                self._tp_csrf = None
+                logger.warning(f"Error query TrustPositif untuk {domain} attempt {attempt+1}: {e}")
+                async with self._tp_lock:
+                    self._tp_csrf = None
+                await asyncio.sleep(0.8)
+
         return False
 
     async def check_public_dns(self, domain: str) -> Tuple[bool, List[str], str]:
@@ -93,6 +195,13 @@ class OperatorBlockChecker:
         except dns.resolver.NXDOMAIN:
             return False, [], "NXDOMAIN (Domain tidak terdaftar di DNS publik)"
         except (dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+            # Cek apakah domain memiliki delegasi NS (domain aktif di DNS namun belum ada A-Record)
+            try:
+                ns_ans = await resolver.resolve(host, 'NS')
+                if ns_ans:
+                    return True, [], "No A-Record (NS Delegated)"
+            except Exception:
+                pass
             return False, [], "No Answer dari DNS Publik"
         except dns.exception.Timeout:
             return False, [], "DNS Query Timeout ke DNS Publik"
@@ -143,17 +252,17 @@ class OperatorBlockChecker:
         Return: (cf_status: 'PHISHING' | 'CLEAN', cf_reason: str)
         """
 
-        if "/" in domain:
-            target_urls = [
-                f"https://{domain}",
-                f"http://{domain}",
-            ]
-        else:
-            target_urls = [
-                f"https://{domain}",
-                f"http://{domain}",
+        target_urls = [
+            f"https://{domain}",
+            f"http://{domain}",
+        ]
+        # Jika domain belum menyertakan path spesifik, tambahkan juga /login
+        # karena Cloudflare Phishing seringkali dipicu pada endpoint login
+        if "/" not in domain:
+            target_urls.extend([
                 f"https://{domain}/login",
-            ]
+                f"http://{domain}/login",
+            ])
 
         client_kwargs = {
             "headers": self.headers,
@@ -295,21 +404,24 @@ class OperatorBlockChecker:
             "latency_ms": latency
         }
 
-    async def check_domain_all_operators(self, domain: str) -> Dict[str, Any]:
+    async def check_domain_all_operators(self, domain: str, tp_blocked: Optional[bool] = None) -> Dict[str, Any]:
         """
         Memeriksa 1 domain secara paralel di 4 operator (Telkomsel, XL, IM3, Tri).
         Memprioritaskan database TrustPositif Komdigi di awal, diikuti DNS operator & Cloudflare.
+        Jika tp_blocked sudah diberikan (misal dari bulk check), gunakan nilai tersebut tanpa kueri ulang.
         """
         async with self.semaphore:
             logger.info(f"Mulai pengecekan domain: {domain}")
             operators = ["Telkomsel", "XL", "IM3", "Tri"]
 
             # 1. PRIORITAS UTAMA: Cek Database Resmi Komdigi TrustPositif & Cloudflare Status
-            tp_task = self.check_trustpositif(domain)
-            cf_task = self.check_cloudflare_status(domain)
-
-            tp_res, cf_res = await asyncio.gather(tp_task, cf_task, return_exceptions=True)
-            tp_blocked = bool(tp_res) if not isinstance(tp_res, Exception) else False
+            if tp_blocked is None:
+                tp_task = self.check_trustpositif(domain)
+                cf_task = self.check_cloudflare_status(domain)
+                tp_res, cf_res = await asyncio.gather(tp_task, cf_task, return_exceptions=True)
+                tp_blocked = bool(tp_res) if not isinstance(tp_res, Exception) else False
+            else:
+                cf_res = await self.check_cloudflare_status(domain)
 
             if isinstance(cf_res, Exception):
                 logger.error(f"Error checking cloudflare for {domain}: {cf_res}")
@@ -342,8 +454,8 @@ class OperatorBlockChecker:
 
             # 2. Jika Tidak Ada di TrustPositif, validasi ke DNS Publik
             public_ok, public_ips, public_msg = await self.check_public_dns(domain)
-            if not public_ok:
-                # Bebas Nawala, namun domain tidak aktif/resolving di DNS publik
+            if not public_ok and "NXDOMAIN" in public_msg:
+                # Domain benar-benar tidak terdaftar di DNS publik (NXDOMAIN)
                 nx_results = {
                     op: {
                         "operator": op,
@@ -408,9 +520,24 @@ class OperatorBlockChecker:
 
     async def check_batch_domains(self, domain_list: List[str]) -> List[Dict[str, Any]]:
         """
-        Memeriksa massal (ratusan domain sekaligus) secara paralel.
+        Memeriksa massal (ratusan domain sekaligus) secara optimal & paralel.
+        Langkah 1: Mengambil status TrustPositif Komdigi untuk seluruh domain secara bulk (1-2 request POST).
+        Langkah 2: Menjalankan pengecekan operator ISP & Cloudflare secara paralel menggunakan hasil TrustPositif.
         """
-        tasks = [self.check_domain_all_operators(domain) for domain in domain_list]
+        if not domain_list:
+            return []
+
+        # 1. Bulk check ke TrustPositif Komdigi (1 request cepat & bebas 503)
+        tp_map = await self.check_trustpositif_bulk(domain_list)
+
+        # 2. Parallel check ke 4 operator ISP & Cloudflare
+        tasks = [
+            self.check_domain_all_operators(
+                domain,
+                tp_blocked=tp_map.get(domain.split("/")[0].strip().lower(), False)
+            )
+            for domain in domain_list
+        ]
         return await asyncio.gather(*tasks)
 
 # Global Instance

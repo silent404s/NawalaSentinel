@@ -47,12 +47,12 @@ NawalaSentinel/
 │   ├── static/                # Asset CSS Dark-mode Glassmorphism & JS
 │   │   ├── css/style.css
 │   │   └── js/main.js
-│   └── templates/             # Jinja2 HTML Templates (index, domains, logs, settings)
+│   └── templates/             # Jinja2 HTML Templates (index, logs, settings, docs)
 │       ├── base.html
 │       ├── index.html
-│       ├── domains.html
 │       ├── logs.html
-│       └── settings.html
+│       ├── settings.html
+│       └── docs.html
 ├── data/                      # Direktori SQLite Database (nawalasentinel.db)
 ├── main.py                    # Entry point uvicorn server
 ├── requirements.txt           # File dependensi Python

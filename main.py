@@ -2,7 +2,8 @@ import uvicorn
 import logging
 import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -16,6 +17,7 @@ if sys.platform == "win32":
 from app.config import settings
 from app.database import init_db
 from app.scheduler import start_scheduler, stop_scheduler
+from app.telegram_bot import telegram_bot_engine
 from app.routes import router
 
 # Setup logging
@@ -28,7 +30,7 @@ logger = logging.getLogger("main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Inisialisasi aplikasi: buat tabel DB & aktifkan background scheduler.
+    Inisialisasi aplikasi: buat tabel DB, aktifkan background scheduler & bot Telegram.
     """
     logger.info("🚀 Menginisialisasi Database SQLite & Tabel...")
     await init_db()
@@ -36,9 +38,13 @@ async def lifespan(app: FastAPI):
     logger.info("⚡ Mengaktifkan APScheduler Background Task (5 Menit)...")
     start_scheduler()
 
+    logger.info("🤖 Mengaktifkan Telegram Multi-Tenant Bot Listener...")
+    await telegram_bot_engine.start()
+
     yield
 
-    logger.info("🛑 Menghentikan scheduler dan mematikan aplikasi...")
+    logger.info("🛑 Menghentikan scheduler & bot Telegram...")
+    await telegram_bot_engine.stop()
     stop_scheduler()
 
 # Inisialisasi FastAPI App
@@ -56,6 +62,16 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY if hasattr(
 
 # Mount Folder Asset Statis (CSS, JS)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# Custom Exception Handler untuk Redirect otomatis ke /login jika belum terotentikasi
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    if exc.status_code == 401 and exc.detail == "AUTH_REQUIRED_HTML":
+        next_path = request.url.path
+        if next_path in ("/logout", "/login"):
+            next_path = "/"
+        return RedirectResponse(url=f"/login?next={next_path}", status_code=302)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 # Mount Routes
 app.include_router(router)

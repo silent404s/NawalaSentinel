@@ -14,6 +14,13 @@ class Settings:
     PORT: int = int(os.getenv("PORT", "8000"))
     SECRET_KEY: str = os.getenv("SECRET_KEY", "nawalasentinel-secret-key-3908420934")
     
+    # Keamanan Sesi, 2FA, & Login
+    SESSION_COOKIE_NAME: str = os.getenv("SESSION_COOKIE_NAME", "ns_session")
+    SESSION_IDLE_TIMEOUT_MINUTES: int = int(os.getenv("SESSION_IDLE_TIMEOUT_MINUTES", "60"))
+    SESSION_MAX_LIFETIME_HOURS: int = int(os.getenv("SESSION_MAX_LIFETIME_HOURS", "24"))
+    MAX_LOGIN_ATTEMPTS: int = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
+    LOCKOUT_DURATION_MINUTES: int = int(os.getenv("LOCKOUT_DURATION_MINUTES", "15"))
+
     # Mode Pengujian Lokal / Simulasi (Memungkinkan pengujian seluruh status di localhost tanpa modem 4G fisik)
     LOCAL_TEST_MODE: bool = os.getenv("LOCAL_TEST_MODE", "False").lower() in ("true", "1", "t")
 
@@ -103,6 +110,10 @@ class Settings:
         "deceptive site ahead",
         "the site ahead contains harmful programs",
         "peringatan: terindikasi phishing",
+        "potential phishing",
+        "cloudflare.com/learning/security/threats/phishing",
+        "cf-phishing",
+        "this website has been reported as a deceptive site",
     ]
 
 settings = Settings()

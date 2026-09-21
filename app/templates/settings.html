@@ -11,6 +11,135 @@
 </div>
 
 <form id="settingsForm">
+    <!-- 1. Jadwal & Kapasitas Pemindaian Domain (Scheduler & Performance) -->
+    <div class="glass-card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-emerald);">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff;">Jadwal & Kapasitas Pemindaian Domain (Scheduler & Performance)</h3>
+                    <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                        Atur interval jadwal pengecekan otomatis, ukuran batch per sesi, batas koneksi paralel, dan jeda antar sesi.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="preset-btn-group">
+                <span style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono); margin-right: 0.25rem;">Preset Cepat:</span>
+                <button type="button" class="preset-btn" data-interval="5" data-chunk="500" data-concurrent="30" data-delay="5.0">
+                    🟢 Aman & Stabil (5 Mnt / 500 Dmn)
+                </button>
+                <button type="button" class="preset-btn" data-interval="3" data-chunk="1000" data-concurrent="40" data-delay="3.0">
+                    🟡 Standar (3 Mnt / 1000 Dmn)
+                </button>
+                <button type="button" class="preset-btn" data-interval="1" data-chunk="1000" data-concurrent="50" data-delay="2.0">
+                    ⚡ Cepat / Pengujian (1 Mnt / 1000 Dmn)
+                </button>
+            </div>
+        </div>
+
+        <!-- 4 Input Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; color: var(--text-main);">
+                    Interval Pengecekan (Menit):
+                </label>
+                <input type="number" id="check_interval" name="check_interval" value="{{ settings.CHECK_INTERVAL_MINUTES }}" min="1" max="1440" class="form-control" style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;">
+                <small style="color: var(--text-muted); font-size: 0.73rem; margin-top: 0.35rem; display: block;">
+                    Berapa menit sekali scheduler berjalan otomatis (misal: 1, 2, 5).
+                </small>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; color: var(--text-main);">
+                    Ukuran Batch per Sesi (Domain):
+                </label>
+                <input type="number" id="chunk_size" name="chunk_size" value="{{ settings.CHUNK_SIZE }}" min="50" max="5000" step="50" class="form-control" style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;">
+                <small style="color: var(--text-muted); font-size: 0.73rem; margin-top: 0.35rem; display: block;">
+                    Jumlah domain diproses per sesi (misal: 500, 1000, 2000).
+                </small>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; color: var(--text-main);">
+                    Koneksi Simultan (Concurrency):
+                </label>
+                <input type="number" id="concurrent_checks" name="concurrent_checks" value="{{ settings.CONCURRENT_CHECKS }}" min="5" max="150" step="5" class="form-control" style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;">
+                <small style="color: var(--text-muted); font-size: 0.73rem; margin-top: 0.35rem; display: block;">
+                    Berapa domain dicek paralel bersamaan (Rekomendasi: 25-50).
+                </small>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; color: var(--text-main);">
+                    Jeda Antar Batch (Detik):
+                </label>
+                <input type="number" id="chunk_delay" name="chunk_delay" value="{{ settings.CHUNK_DELAY_SECONDS }}" min="0" max="60" step="0.5" class="form-control" style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;">
+                <small style="color: var(--text-muted); font-size: 0.73rem; margin-top: 0.35rem; display: block;">
+                    Istirahat sejenak sebelum sesi berikutnya untuk pendinginan I/O.
+                </small>
+            </div>
+        </div>
+
+        <!-- Live Performance Estimator Box -->
+        <div class="estimator-container" style="background: rgba(11,15,25,0.7); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.45rem;">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="color: var(--accent-sky);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    Kalkulator Estimasi Beban Sistem (Simulasi 1.000 Domain)
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);">Real-time Auto Calculation</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                <div style="background: var(--bg-surface); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                    <div style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono);">Perkiraan Durasi Scan</div>
+                    <div id="estDuration" style="font-size: 0.95rem; font-weight: 700; color: var(--accent-sky); font-family: var(--font-mono); margin-top: 0.2rem;">~35 - 45 detik</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem;">untuk 1.000 domain</div>
+                </div>
+
+                <div style="background: var(--bg-surface); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                    <div style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono);">Beban CPU & RAM</div>
+                    <div id="estCpuLoad" style="font-size: 0.95rem; font-weight: 700; color: #34d399; font-family: var(--font-mono); margin-top: 0.2rem;">Ringan (&lt; 15% CPU)</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem;">Memory ~120MB</div>
+                </div>
+
+                <div style="background: var(--bg-surface); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                    <div style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono);">Kapasitas Siklus Waktu</div>
+                    <div id="estCycleFit" style="font-size: 0.95rem; font-weight: 700; color: #34d399; font-family: var(--font-mono); margin-top: 0.2rem;">Leluasa / Pas</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem;">Selesai sebelum siklus baru</div>
+                </div>
+
+                <div style="background: var(--bg-surface); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                    <div style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono);">Status TrustPositif Komdigi</div>
+                    <div id="estKomdigiSafety" style="font-size: 0.95rem; font-weight: 700; color: #34d399; font-family: var(--font-mono); margin-top: 0.2rem;">Sangat Aman</div>
+                    <div id="estKomdigiDesc" style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem; line-height: 1.3;">Bebas dari risiko rate-limit</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panduan Rekomendasi Kapasitas & Angka Aman -->
+        <div style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.2); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-sky); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;">
+                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                Panduan Rekomendasi: Berapa Angka Aman & Maksimal?
+            </div>
+            <div style="font-size: 0.77rem; color: var(--text-secondary); line-height: 1.5;">
+                <p style="margin-bottom: 0.35rem;">
+                    • <strong>Angka Aman (Direkomendasikan):</strong> <strong>Interval 3 - 5 Menit</strong> dengan <strong>500 Domain per Batch</strong> dan <strong>Concurrency 30</strong>. Pada setelan ini, beban jaringan dan CPU sangat rendah, dan server Komdigi TrustPositif menerima permintaan secara teratur tanpa memicu sistem proteksi/WAF.
+                </p>
+                <p style="margin-bottom: 0;">
+                    • <strong>Angka Maksimal (Batas Atas):</strong> <strong>Interval 1 - 2 Menit</strong> untuk <strong>1.000 Domain</strong> dengan <strong>Concurrency 50 - 60</strong>. Pada setelan ini, 1.000 domain selesai dalam waktu ~40 detik. <em>Hindari Concurrency di atas 75</em> agar socket jaringan OS tidak mengalami packet loss dan IP server Anda tidak terkena rate-limit (HTTP 429) dari portal TrustPositif Komdigi.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Grid Telegram & Proxy -->
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;" class="grid-two-col">
 
         <!-- Telegram & Alerting Form -->
@@ -29,8 +158,11 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Telegram Chat ID / Channel ID:</label>
-                <input type="text" id="telegram_chat_id" name="telegram_chat_id" value="{{ settings.TELEGRAM_CHAT_ID }}" placeholder="-100123456789 atau 1234567" class="form-control">
+                <label class="form-label">Telegram Chat ID Admin <span style="color: var(--text-dim); font-size: 0.75rem; font-weight: normal;">(Opsional - Khusus Channel Admin)</span>:</label>
+                <input type="text" id="telegram_chat_id" name="telegram_chat_id" value="{{ settings.TELEGRAM_CHAT_ID }}" placeholder="Kosongkan jika hanya untuk grup pelanggan" class="form-control">
+                <small style="color: var(--text-dim); font-size: 0.72rem; display: block; margin-top: 4px;">
+                    Biarkan kosong jika Anda tidak memerlukan channel khusus admin. ID grup pelanggan diatur di menu <strong>Pelanggan</strong>.
+                </small>
             </div>
 
             <!-- Modern Toggle Switch for Telegram -->
@@ -45,26 +177,9 @@
                 </label>
             </div>
 
-            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-
-            <div class="form-group">
-                <label class="form-label">Interval Pengecekan Otomatis (Menit):</label>
-                <input type="number" name="check_interval" value="{{ settings.CHECK_INTERVAL_MINUTES }}" min="1" max="1440" class="form-control">
-                <small style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.35rem; display: block;">Default: Setiap 5 menit sekali</small>
-            </div>
-
-
-            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">
-                    <svg class="svg-icon" viewBox="0 0 24 24">
-                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                        <polyline points="7 3 7 8 15 8"></polyline>
-                    </svg>
-                    Simpan Pengaturan
-                </button>
-                <button type="button" id="btnTestTelegram" class="btn btn-secondary">
-                    <svg class="svg-icon" viewBox="0 0 24 24">
+            <div style="margin-top: 1.25rem;">
+                <button type="button" id="btnTestTelegram" class="btn btn-secondary btn-sm" style="width: 100%;">
+                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                     </svg>
@@ -126,7 +241,182 @@
             </div>
         </div>
     </div>
+
+    <!-- 3. Bottom Action Bar -->
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="submit" class="btn btn-primary" style="padding: 0.65rem 1.75rem; font-size: 0.88rem; font-weight: 600;">
+            <svg class="svg-icon" viewBox="0 0 24 24">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Simpan Seluruh Pengaturan
+        </button>
+    </div>
 </form>
+
+<!-- Keamanan Akun & Sesi Login (2FA & Single Active Session) -->
+<div class="glass-card" style="margin-top: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <svg class="svg-icon" viewBox="0 0 24 24" style="color: var(--accent-sky);">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path d="M9 12l2 2 4-4"></path>
+            </svg>
+            <div>
+                <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff;">Keamanan Akun & Sesi Login (2FA & Active Sessions)</h3>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                    Kelola autentikasi dua faktor (Google Authenticator), sesi aktif perangkat, dan pantau riwayat login akun Anda.
+                </p>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button type="button" id="btnOpenReset2faModal" class="btn btn-secondary btn-sm" style="color: #fca5a5; border-color: rgba(239,68,68,0.3);">
+                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+                Reset 2FA
+            </button>
+            <button type="button" id="btnLogoutAllSessions" class="btn btn-secondary btn-sm" style="background: rgba(239,68,68,0.1); color: #ef4444; border-color: rgba(239,68,68,0.3);">
+                <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Logout Semua Sesi
+            </button>
+        </div>
+    </div>
+
+    <!-- 2FA & Session Status Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+        <!-- Status 2FA -->
+        <div style="background: rgba(11,15,25,0.6); padding: 0.85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono); margin-bottom: 0.35rem;">Status Google Authenticator (2FA)</div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                {% if current_user.is_totp_enabled %}
+                <span class="badge-status" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); font-weight: 700;">
+                    ✓ AKTIF & TERPROTEKSI
+                </span>
+                {% else %}
+                <span class="badge-status" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); font-weight: 700;">
+                    BELUM DIAKTIFKAN
+                </span>
+                {% endif %}
+            </div>
+            <small style="color: var(--text-muted); font-size: 0.72rem; margin-top: 0.45rem; display: block;">
+                Login selalu memerlukan 6-digit TOTP dari aplikasi Google Authenticator.
+            </small>
+        </div>
+
+        <!-- Sesi Aktif Saat Ini -->
+        <div style="background: rgba(11,15,25,0.6); padding: 0.85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-family: var(--font-mono); margin-bottom: 0.35rem;">Sesi Perangkat Aktif Saat Ini</div>
+            <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; color: #ffffff;">
+                {{ active_session.device_info or 'Perangkat Ini' }}
+            </div>
+            <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                IP: <span style="font-family: var(--font-mono); color: var(--accent-sky);">{{ active_session.ip_address or '127.0.0.1' }}</span> &bull; 
+                Login: <span style="font-family: var(--font-mono);">{{ active_session.created_at | wib_time if active_session else '-' }}</span>
+            </div>
+            <small style="color: var(--accent-emerald); font-size: 0.72rem; margin-top: 0.35rem; display: block;">
+                🛡️ Sistem Single-Session: 1 Akun = 1 Sesi Aktif.
+            </small>
+        </div>
+    </div>
+
+    <!-- Tabel Riwayat Login Terakhir -->
+    <div style="margin-top: 1rem;">
+        <div style="font-size: 0.82rem; font-weight: 700; color: #ffffff; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 0.45rem;">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" style="color: var(--accent-indigo);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Riwayat Aktivitas Login Terakhir (Audit Log)
+        </div>
+        
+        <div style="overflow-x: auto; background: rgba(11,15,25,0.4); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+            <table class="table-custom" style="width: 100%; margin: 0; font-size: 0.78rem;">
+                <thead>
+                    <tr>
+                        <th style="padding: 0.6rem 0.85rem;">Waktu (WIB)</th>
+                        <th style="padding: 0.6rem 0.85rem;">Aktivitas</th>
+                        <th style="padding: 0.6rem 0.85rem;">Pengguna</th>
+                        <th style="padding: 0.6rem 0.85rem;">IP Address</th>
+                        <th style="padding: 0.6rem 0.85rem;">Perangkat / Browser</th>
+                        <th style="padding: 0.6rem 0.85rem;">Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_login_logs %}
+                    <tr>
+                        <td style="padding: 0.55rem 0.85rem; font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap;">
+                            {{ log.created_at | wib_datetime }}
+                        </td>
+                        <td style="padding: 0.55rem 0.85rem; white-space: nowrap;">
+                            {% if log.event_type == 'LOGIN_SUCCESS' %}
+                            <span class="badge-status" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); font-size: 0.68rem;">LOGIN SUKSES</span>
+                            {% elif log.event_type == 'LOGIN_FAILED' %}
+                            <span class="badge-status" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); font-size: 0.68rem;">LOGIN GAGAL</span>
+                            {% elif log.event_type == '2FA_FAILED' %}
+                            <span class="badge-status" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); font-size: 0.68rem;">2FA GAGAL</span>
+                            {% elif log.event_type == 'LOGOUT' %}
+                            <span class="badge-status" style="background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); font-size: 0.68rem;">LOGOUT</span>
+                            {% elif log.event_type == 'SESSIONS_REVOKED' %}
+                            <span class="badge-status" style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); font-size: 0.68rem;">SEMUA SESI DIPUTUS</span>
+                            {% elif log.event_type == '2FA_RESET' %}
+                            <span class="badge-status" style="background: rgba(244,63,94,0.15); color: #fb7185; border: 1px solid rgba(244,63,94,0.3); font-size: 0.68rem;">2FA DIRESET</span>
+                            {% else %}
+                            <span class="badge-status" style="font-size: 0.68rem;">{{ log.event_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.55rem 0.85rem; font-family: var(--font-mono); font-weight: 600; color: #ffffff;">
+                            {{ log.username or '-' }}
+                        </td>
+                        <td style="padding: 0.55rem 0.85rem; font-family: var(--font-mono); color: var(--accent-sky);">
+                            {{ log.ip_address or '-' }}
+                        </td>
+                        <td style="padding: 0.55rem 0.85rem; color: var(--text-secondary);">
+                            {{ log.device_info or '-' }}
+                        </td>
+                        <td style="padding: 0.55rem 0.85rem; color: var(--text-muted); font-size: 0.74rem;">
+                            {{ log.reason or '-' }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                            Belum ada riwayat aktivitas login yang tercatat.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reset 2FA -->
+<div id="reset2faModal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog" style="max-width: 460px;">
+        <div class="modal-header">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem; color: #ef4444;">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                Reset Google Authenticator (2FA)
+            </h3>
+            <button type="button" class="modal-close" id="btnCloseReset2faModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 0.83rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1rem;">
+                Mereset 2FA akan menghapus kunci rahasia saat ini dan memutus seluruh sesi login aktif. Anda akan otomatis logout dan diminta mengonfigurasi ulang 2FA pada login berikutnya.
+            </p>
+            <form id="reset2faForm">
+                <div class="form-group">
+                    <label class="form-label" for="resetCurrentPassword">Ketik Password Anda untuk Konfirmasi:</label>
+                    <input type="password" id="resetCurrentPassword" class="form-control" placeholder="••••••••" required>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 0.65rem; margin-top: 1.25rem;">
+                    <button type="button" class="btn btn-secondary" id="btnCancelReset2fa">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btnConfirmReset2fa" style="background: #ef4444; border-color: #dc2626;">
+                        Konfirmasi & Reset 2FA
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Pembaruan Sistem & Sinkronisasi GitHub (Safe Update Engine) -->
 <div class="glass-card" style="margin-top: 1.5rem;">
